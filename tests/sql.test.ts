@@ -1,17 +1,13 @@
-/// <reference types="node" />
 /**
  * Runs the real Supabase migration against an in-memory Postgres (PGlite) and
  * plays the game through the same functions the app calls. Supabase's `auth`
  * schema is stubbed: auth.uid() reads the user id we set per call.
  */
-import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { scoreAnswer } from '@/game/scoring';
 import type { Call } from '@/game/types';
-
-const MIGRATION = readFileSync(new URL('../supabase/migrations/20260927000000_init.sql', import.meta.url), 'utf8');
-const BOARDS = ['video-games', 'music', 'general', 'history', 'geography', 'film', 'science', 'pop-culture', 'tech', 'anime', 'tv', 'books-art', 'sports', 'mind-games', 'cricket', 'bollywood'];
+import { MIGRATION, createDb } from './helpers/pg';
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -64,30 +60,9 @@ async function playQuestion(uid: string, board: string, i: number, call: Call, o
 }
 
 beforeAll(async () => {
-  db = new PGlite();
-  await db.exec(`
-    create role anon nologin;
-    create role authenticated nologin;
-    create schema auth;
-    create table auth.users (id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-    grant usage on schema auth to anon, authenticated;
-    grant usage on schema public to anon, authenticated;
-    grant execute on function auth.uid() to anon, authenticated;
-  `);
+  db = await createDb([A, B, C]);
+  // Running the migration twice must be safe (people re-run it after edits).
   await db.exec(MIGRATION);
-  // Running it twice must be safe (people re-run it after edits).
-  await db.exec(MIGRATION);
-
-  await db.query(`insert into auth.users (id) values ($1), ($2), ($3)`, [A, B, C]);
-  // 20 questions per board: enough for every run and for the no-repeat rule.
-  const values: string[] = [];
-  for (const b of BOARDS) {
-    for (let i = 0; i < 20; i++) {
-      values.push(`('${b}', 'Question ${i} about ${b}?', 'Question ${i}', array['Right','Wrong','Other','Else'], 0, 'test-${b}-${i}')`);
-    }
-  }
-  await db.exec(`insert into public.questions (board, prompt, teaser, options, answer_index, source_id) values ${values.join(',')};`);
 }, 60_000);
 
 describe('score_answer (SQL) matches src/game/scoring.ts', () => {

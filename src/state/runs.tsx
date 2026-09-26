@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MomentId } from '@/game/moments';
-import type { AnswerRecord, BoardId } from '@/game/types';
+import type { AnswerRecord, BoardId, Question } from '@/game/types';
 import { KEYS, loadJson, saveJson } from '@/lib/storage';
 
 /** One ranked attempt. Saved after every answer so quitting the app can't reset it. */
@@ -11,6 +11,8 @@ export type RunRecord = {
   total: number;
   questionCount: number;
   answers: AnswerRecord[];
+  /** The questions shown so far, with answers (only saved once answered). */
+  questions: Question[];
   moments: MomentId[];
   biggest: MomentId | null;
   grid: string;

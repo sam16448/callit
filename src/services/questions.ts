@@ -1,22 +1,25 @@
 /**
- * Where run questions come from.
+ * Where a run's questions come from.
  *
- * Today (offline): the 30 sample questions bundled in the app, picked per UTC
- * day with a seeded shuffle, so answers live on the phone.
- * Next (Supabase): `get_teaser` / `place_call` / `submit_answer` server
- * functions; the phone never receives the correct answer before answering.
- * Screens only talk to this file, so that swap stays in one place.
+ * Online (Supabase keys in .env): the server picks the day's questions and
+ * scores every answer; all 16 boards are open.
+ * Offline (no keys): the 30 bundled sample questions, picked per UTC day and
+ * scored on the phone with the same rules. Screens only use this file.
  */
 import { SAMPLE_QUESTIONS } from '@/data/sampleQuestions';
 import { dailyRun, hasRun } from '@/game/dailySet';
-import type { BoardId, Question } from '@/game/types';
+import type { RunDriver } from '@/game/driver';
+import { createOfflineDriver } from '@/game/offlineDriver';
+import type { BoardId } from '@/game/types';
+import { createOnlineDriver } from './onlineDriver';
+import { ONLINE } from './supabase';
 
-export const QUESTION_SOURCE = 'offline' as 'offline' | 'supabase';
+export const QUESTION_SOURCE: 'offline' | 'supabase' = ONLINE ? 'supabase' : 'offline';
 
 export function isBoardPlayable(board: BoardId): boolean {
-  return hasRun(board, SAMPLE_QUESTIONS);
+  return ONLINE || hasRun(board, SAMPLE_QUESTIONS);
 }
 
-export function loadDailyRun(board: BoardId, day: string): Question[] {
-  return dailyRun(board, day, SAMPLE_QUESTIONS);
+export function createDriver(board: BoardId, day: string): RunDriver {
+  return ONLINE ? createOnlineDriver(board) : createOfflineDriver(dailyRun(board, day, SAMPLE_QUESTIONS));
 }

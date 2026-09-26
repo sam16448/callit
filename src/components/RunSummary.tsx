@@ -3,13 +3,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { CallTag } from '@/components/CallTag';
 import { Card, SectionLabel } from '@/components/ui';
 import { DEFAULT_CAPTIONS } from '@/game/moments';
-import type { Question } from '@/game/types';
 import { formatPoints } from '@/lib/format';
 import type { RunRecord } from '@/state/runs';
 import { C, F, S, T } from '@/theme';
 
 /** End-of-run recap, built from the saved record so it looks the same when reopened later. */
-export function RunSummary({ record, questions, boardName }: { record: RunRecord; questions: Question[]; boardName: string }) {
+export function RunSummary({ record, boardName }: { record: RunRecord; boardName: string }) {
+  const questions = record.questions ?? [];
   const correct = record.answers.filter((a) => a.correct).length;
   const allins = record.answers.filter((a) => a.call === 'allin');
   let best = 0;
@@ -24,7 +24,7 @@ export function RunSummary({ record, questions, boardName }: { record: RunRecord
   return (
     <View>
       <Animated.View entering={FadeInDown.duration(300)} style={styles.head}>
-        <Text style={[T.label, { color: C.accent }]}>{boardName} · run complete</Text>
+        <Text style={[T.label, { color: C.accent }]}>{boardName} · {record.answers.length < record.questionCount ? 'run so far' : 'run complete'}</Text>
         <Text style={styles.total}>{formatPoints(record.total)}</Text>
         <Text style={styles.grid}>{record.grid}</Text>
       </Animated.View>

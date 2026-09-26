@@ -2,21 +2,49 @@ import { describe, expect, it } from 'vitest';
 import { SAMPLE_QUESTIONS } from '@/data/sampleQuestions';
 import { BOARDS } from '@/game/boards';
 import { dailyRun, hasRun, seededShuffle } from '@/game/dailySet';
-import { currentQuestion, runReducer, runStats, shareGrid, startRun, type RunState } from '@/game/run';
+import type { RunDriver } from '@/game/driver';
+import { createOfflineDriver } from '@/game/offlineDriver';
+import { runReducer, runStats, shareGrid, startRun, type RunState } from '@/game/run';
 import { QUESTION_MS } from '@/game/scoring';
 import { teaserFor } from '@/game/teaser';
 import { formatCountdown, msUntilNextRun, nextDayStreak, utcDay, weekStart } from '@/game/time';
-import type { Call } from '@/game/types';
+import type { Call, Question } from '@/game/types';
 
 const DAY = '2026-09-27';
 
-/** Plays one question: call, then answer after `takenMs` (null choice = let the timer run out). */
-function play(s: RunState, call: Call, correct: boolean | null, takenMs = 3_000, t0 = 1_000_000): RunState {
-  const q = currentQuestion(s)!;
-  s = runReducer(s, { type: 'PLACE_CALL', call, now: t0 });
-  if (correct === null) s = runReducer(s, { type: 'TIMEOUT', now: t0 + QUESTION_MS });
-  else s = runReducer(s, { type: 'ANSWER', choice: correct ? q.answerIndex : (q.answerIndex + 1) % q.options.length, now: t0 + takenMs });
+/** A fake clock the tests move by hand. */
+function fakeClock(start = 1_000_000) {
+  let t = start;
+  return { now: () => t, advance: (ms: number) => (t += ms) };
+}
+
+/** Plays one question through the driver and reducer, like the screen does. */
+async function play(
+  s: RunState,
+  d: RunDriver,
+  clock: ReturnType<typeof fakeClock>,
+  call: Call,
+  outcome: 'right' | 'wrong' | 'timeout',
+  takenMs = 3_000,
+): Promise<RunState> {
+  s = runReducer(s, { type: 'TEASER', teaser: await d.teaser(s.index) });
+  const r = await d.call(s.index, call);
+  s = runReducer(s, { type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
+  clock.advance(takenMs);
+  const right = questionsFor(d)[s.index].answerIndex;
+  const choice = outcome === 'timeout' ? null : outcome === 'right' ? right : (right + 1) % r.options.length;
+  s = runReducer(s, { type: 'ANSWERED', outcome: await d.answer(s.index, choice) });
   return runReducer(s, { type: 'NEXT' });
+}
+
+const driverQuestions = new WeakMap<RunDriver, Question[]>();
+function questionsFor(d: RunDriver): Question[] {
+  return driverQuestions.get(d)!;
+}
+function newDriver(questions: Question[], clock: ReturnType<typeof fakeClock>): RunDriver {
+  const d = createOfflineDriver(questions, clock.now);
+  driverQuestions.set(d, questions);
+  return d;
 }
 
 describe('sample questions', () => {
@@ -84,78 +112,119 @@ describe('dailyRun', () => {
   });
 });
 
-describe('run state machine', () => {
+describe('run state machine with the offline driver', () => {
   const questions = dailyRun('tech', DAY, SAMPLE_QUESTIONS);
 
-  it('goes call → question → result → call and ends on the summary', () => {
-    let s = startRun(questions);
+  it('goes teaser → call → question → result and ends on the summary', async () => {
+    const clock = fakeClock();
+    const d = newDriver(questions, clock);
+    let s = startRun(questions.length);
     expect(s.phase).toBe('call');
-    s = runReducer(s, { type: 'PLACE_CALL', call: 'sure', now: 0 });
+    expect(s.teaser).toBeNull(); // loading
+    s = runReducer(s, { type: 'TEASER', teaser: await d.teaser(0) });
+    expect(s.teaser?.teaser).toBe(teaserFor(questions[0]));
+    const r = await d.call(0, 'sure');
+    s = runReducer(s, { type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
     expect(s.phase).toBe('question');
-    s = runReducer(s, { type: 'ANSWER', choice: questions[0].answerIndex, now: 7_500 });
+    expect(s.revealed?.options).toEqual(questions[0].options);
+    clock.advance(7_500);
+    s = runReducer(s, { type: 'ANSWERED', outcome: await d.answer(0, questions[0].answerIndex) });
     expect(s.phase).toBe('result');
     expect(s.answers[0].points).toBe(250);
+    expect(s.questions[0].answerIndex).toBe(questions[0].answerIndex);
     s = runReducer(s, { type: 'NEXT' });
-    expect(s.phase).toBe('call');
-    expect(s.index).toBe(1);
-    for (let i = 1; i < questions.length; i++) s = play(s, 'safe', true);
+    expect(s).toMatchObject({ phase: 'call', index: 1, teaser: null });
+    for (let i = 1; i < questions.length; i++) s = await play(s, d, clock, 'safe', 'right');
     expect(s.phase).toBe('summary');
   });
 
-  it('ignores actions that do not fit the phase (no double answers)', () => {
-    let s = startRun(questions);
+  it('ignores actions that do not fit the phase', async () => {
+    const clock = fakeClock();
+    const d = newDriver(questions, clock);
+    let s = startRun(questions.length);
     const before = s;
-    expect(runReducer(s, { type: 'ANSWER', choice: 0, now: 1 })).toBe(before);
-    s = runReducer(s, { type: 'PLACE_CALL', call: 'safe', now: 0 });
-    expect(runReducer(s, { type: 'PLACE_CALL', call: 'allin', now: 1 }).call).toBe('safe');
-    s = runReducer(s, { type: 'ANSWER', choice: 0, now: 1_000 });
-    const answered = s.answers.length;
-    s = runReducer(s, { type: 'ANSWER', choice: 1, now: 1_100 });
-    s = runReducer(s, { type: 'TIMEOUT', now: 20_000 });
-    expect(s.answers.length).toBe(answered);
+    expect(runReducer(s, { type: 'CALLED', call: 'safe', revealed: { prompt: 'x', options: [] }, shownAt: 0 })).toBe(before); // no teaser yet
+    s = runReducer(s, { type: 'TEASER', teaser: await d.teaser(0) });
+    const r = await d.call(0, 'safe');
+    s = runReducer(s, { type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
+    expect(runReducer(s, { type: 'CALLED', call: 'allin', revealed: r, shownAt: 5 }).call).toBe('safe');
+    s = runReducer(s, { type: 'ANSWERED', outcome: await d.answer(0, 0) });
+    expect(runReducer(s, { type: 'ANSWERED', outcome: { choice: 1, correct: true, answerIndex: 1, msLeft: 1, points: 999 } })).toBe(s);
   });
 
-  it('treats a timeout and a too-late tap as a miss', () => {
-    let s = startRun(questions);
-    s = runReducer(s, { type: 'PLACE_CALL', call: 'allin', now: 0 });
-    s = runReducer(s, { type: 'TIMEOUT', now: QUESTION_MS });
-    expect(s.answers[0]).toMatchObject({ choice: null, correct: false, points: -300, msLeft: 0 });
-
-    let t = startRun(questions);
-    t = runReducer(t, { type: 'PLACE_CALL', call: 'sure', now: 0 });
-    t = runReducer(t, { type: 'ANSWER', choice: questions[0].answerIndex, now: QUESTION_MS + 50 });
-    expect(t.answers[0]).toMatchObject({ choice: null, correct: false, points: -150 });
+  it('the driver allows one answer, keeps the first call and blocks skipping', async () => {
+    const clock = fakeClock();
+    const d = newDriver(questions, clock);
+    await expect(d.answer(0, 0)).rejects.toThrow(/call first/);
+    await expect(d.call(1, 'safe')).rejects.toThrow(/current question/);
+    await d.call(0, 'safe');
+    expect((await d.call(0, 'allin')).call).toBe('safe');
+    await d.answer(0, 0);
+    await expect(d.answer(0, 1)).rejects.toThrow(/Already answered/);
   });
 
-  it('spotlights one moment per question and a perfect run at the end', () => {
-    let s = startRun(questions);
-    s = runReducer(s, { type: 'PLACE_CALL', call: 'allin', now: 0 });
-    s = runReducer(s, { type: 'ANSWER', choice: questions[0].answerIndex, now: 1_000 });
+  it('treats a timeout and a tap after the grace period as a miss, but allows a little lag', async () => {
+    const clock = fakeClock();
+    const d = newDriver(questions, clock);
+    await d.call(0, 'allin');
+    clock.advance(15_000);
+    expect(await d.answer(0, null)).toMatchObject({ choice: null, correct: false, points: -300, msLeft: 0 });
+
+    await d.call(1, 'sure');
+    clock.advance(16_600);
+    expect(await d.answer(1, questions[1].answerIndex)).toMatchObject({ choice: null, correct: false, points: -150 });
+
+    await d.call(2, 'sure');
+    clock.advance(15_800);
+    expect(await d.answer(2, questions[2].answerIndex)).toMatchObject({ correct: true, points: 200 });
+  });
+
+  it('spotlights one moment per question and a perfect run at the end', async () => {
+    const clock = fakeClock();
+    const d = newDriver(questions, clock);
+    let s = startRun(questions.length);
+    s = runReducer(s, { type: 'TEASER', teaser: await d.teaser(0) });
+    const r = await d.call(0, 'allin');
+    s = runReducer(s, { type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
+    clock.advance(1_000);
+    s = runReducer(s, { type: 'ANSWERED', outcome: await d.answer(0, questions[0].answerIndex) });
     expect(s.spotlight).toBe('allin_hit');
     s = runReducer(s, { type: 'NEXT' });
-    for (let i = 1; i < questions.length; i++) s = play(s, 'safe', true, 5_000);
+    for (let i = 1; i < questions.length; i++) s = await play(s, d, clock, 'safe', 'right', 5_000);
     expect(s.endMoments).toContain('perfect_run');
     expect(s.spotlight).toBe('perfect_run');
   });
 
-  it('QUIT ends the run with what was answered', () => {
-    let s = play(startRun(questions), 'sure', true, 7_500);
+  it('QUIT ends the run with what was answered', async () => {
+    const clock = fakeClock();
+    const d = newDriver(questions, clock);
+    let s = await play(startRun(questions.length), d, clock, 'sure', 'right', 7_500);
     s = runReducer(s, { type: 'QUIT' });
     expect(s.phase).toBe('summary');
     expect(runStats(s)).toMatchObject({ answered: 1, total: 250, questionCount: 5 });
   });
 
-  it('builds stats and a share grid', () => {
-    let s = startRun(questions);
-    s = play(s, 'allin', true, 1_000);
-    s = play(s, 'sure', false);
-    s = play(s, 'safe', null);
-    s = play(s, 'safe', true);
-    s = play(s, 'sure', true);
+  it('builds stats and a share grid, and the driver recap matches', async () => {
+    const clock = fakeClock();
+    const d = newDriver(questions, clock);
+    let s = startRun(questions.length);
+    s = await play(s, d, clock, 'allin', 'right', 1_000);
+    s = await play(s, d, clock, 'sure', 'wrong');
+    s = await play(s, d, clock, 'safe', 'timeout', 15_000);
+    s = await play(s, d, clock, 'safe', 'right');
+    s = await play(s, d, clock, 'sure', 'right');
     const st = runStats(s);
     expect(st).toMatchObject({ correct: 3, answered: 5, allinHits: 1, allinCount: 1, bestStreak: 2 });
     expect(st.biggest).toBe('allin_hit');
     expect(shareGrid(s)).toBe('🟪🟥⬜🟦🟩');
+    const recap = await d.recap();
+    expect(recap.map((r) => r.points)).toEqual(s.answers.map((a) => a.points));
+  });
+
+  it('can start part-way through (resuming a run)', () => {
+    const s = startRun(10, { startIndex: 4, startTotal: 620 });
+    expect(s).toMatchObject({ index: 4, total: 620, phase: 'call' });
+    expect(startRun(5, { startIndex: 5 }).phase).toBe('summary');
   });
 });
 

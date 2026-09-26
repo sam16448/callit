@@ -1,29 +1,47 @@
 /**
- * The run as a pure state machine, so it can be tested without a phone:
+ * The run as a pure state machine. It never decides right or wrong itself:
+ * a driver does (the server when online, src/game/offlineDriver.ts offline)
+ * and the screen feeds the results in:
  *
- *   call ──PLACE_CALL──▶ question ──ANSWER / TIMEOUT──▶ result ──NEXT──▶ call … ▶ summary
- *
- * Times are passed in (never read from the clock here). In a ranked online run
- * the server stamps these times; offline the phone does.
+ *   TEASER ▶ call ──CALLED──▶ question ──ANSWERED──▶ result ──NEXT──▶ (TEASER) … ▶ summary
  */
 import { featured, questionMoments, runMoments, type MomentId } from './moments';
-import { QUESTION_MS, clampMsLeft, scoreAnswer } from './scoring';
-import type { AnswerRecord, Call, Question } from './types';
+import type { AnswerRecord, Call, CategoryId, Question } from './types';
 
 export type Phase = 'call' | 'question' | 'result' | 'summary';
 
+export type TeaserInfo = { teaser: string; category: CategoryId };
+export type Revealed = { prompt: string; options: string[] };
+
+/** What the driver reports after an answer (or a timeout: choice null). */
+export type Outcome = {
+  choice: number | null;
+  correct: boolean;
+  answerIndex: number;
+  msLeft: number;
+  points: number;
+  /** Running total from the server; worked out locally when missing. */
+  total?: number;
+  questionId?: string;
+};
+
 export type RunState = {
-  questions: Question[];
+  questionCount: number;
   index: number;
   phase: Phase;
+  /** Null while the next teaser is loading. */
+  teaser: TeaserInfo | null;
   call: Call | null;
-  /** When the options were shown (ms). */
+  /** When the options appeared, on this phone's clock (ms). */
   shownAt: number | null;
+  revealed: Revealed | null;
+  /** Questions answered so far, with their answers, in order. */
+  questions: Question[];
   answers: AnswerRecord[];
   total: number;
   /** Moments triggered by each answered question, same order as answers. */
   moments: MomentId[][];
-  /** The moment to show right now on the result screen. */
+  /** The moment to show right now. */
   spotlight: MomentId | null;
   /** Moments judged at the end of the run (perfect, new #1, streak). */
   endMoments: MomentId[];
@@ -31,21 +49,25 @@ export type RunState = {
 };
 
 export type RunAction =
-  | { type: 'PLACE_CALL'; call: Call; now: number }
-  | { type: 'ANSWER'; choice: number; now: number }
-  | { type: 'TIMEOUT'; now: number }
+  | { type: 'TEASER'; teaser: TeaserInfo }
+  | { type: 'CALLED'; call: Call; revealed: Revealed; shownAt: number }
+  | { type: 'ANSWERED'; outcome: Outcome }
   | { type: 'NEXT'; dayStreak?: number; isNewNumberOne?: boolean }
   | { type: 'QUIT' };
 
-export function startRun(questions: Question[], opts: { chill?: boolean } = {}): RunState {
+export function startRun(questionCount: number, opts: { chill?: boolean; startIndex?: number; startTotal?: number } = {}): RunState {
+  const index = opts.startIndex ?? 0;
   return {
-    questions,
-    index: 0,
-    phase: questions.length ? 'call' : 'summary',
+    questionCount,
+    index,
+    phase: questionCount > index ? 'call' : 'summary',
+    teaser: null,
     call: null,
     shownAt: null,
+    revealed: null,
+    questions: [],
     answers: [],
-    total: 0,
+    total: opts.startTotal ?? 0,
     moments: [],
     spotlight: null,
     endMoments: [],
@@ -53,79 +75,87 @@ export function startRun(questions: Question[], opts: { chill?: boolean } = {}):
   };
 }
 
-export function currentQuestion(s: RunState): Question | undefined {
-  return s.questions[s.index];
-}
-
-export function msLeftAt(s: RunState, now: number): number {
-  if (s.shownAt === null) return QUESTION_MS;
-  return clampMsLeft(QUESTION_MS - (now - s.shownAt));
-}
-
-function record(s: RunState, choice: number | null, now: number): RunState {
-  const q = currentQuestion(s);
-  if (!q || s.call === null) return s;
-  const msLeft = choice === null ? 0 : msLeftAt(s, now);
-  // Answering after the timer ran out counts as a timeout.
-  const late = choice !== null && msLeft <= 0;
-  const correct = !late && choice !== null && choice === q.answerIndex;
-  const points = scoreAnswer(s.call, correct, msLeft);
-  const total = s.total + points;
-  const answer: AnswerRecord = {
-    questionId: q.id,
-    call: s.call,
-    choice: late ? null : choice,
-    correct,
-    msLeft: late ? 0 : msLeft,
-    points,
-    total,
-  };
-  const answers = [...s.answers, answer];
-  const triggered = questionMoments(answers);
-  return {
-    ...s,
-    phase: 'result',
-    answers,
-    total,
-    moments: [...s.moments, triggered],
-    spotlight: featured(triggered, { chill: s.chill }),
-  };
-}
-
 export function runReducer(s: RunState, a: RunAction): RunState {
   switch (a.type) {
-    case 'PLACE_CALL':
+    case 'TEASER':
       if (s.phase !== 'call') return s;
-      return { ...s, phase: 'question', call: a.call, shownAt: a.now };
-    case 'ANSWER':
-      if (s.phase !== 'question') return s;
-      return record(s, a.choice, a.now);
-    case 'TIMEOUT':
-      if (s.phase !== 'question') return s;
-      return record(s, null, a.now);
+      return { ...s, teaser: a.teaser };
+    case 'CALLED':
+      if (s.phase !== 'call' || !s.teaser) return s;
+      return { ...s, phase: 'question', call: a.call, revealed: a.revealed, shownAt: a.shownAt };
+    case 'ANSWERED': {
+      if (s.phase !== 'question' || !s.call || !s.revealed || !s.teaser) return s;
+      const o = a.outcome;
+      const question: Question = {
+        id: o.questionId ?? `q${s.index}`,
+        category: s.teaser.category,
+        prompt: s.revealed.prompt,
+        teaser: s.teaser.teaser,
+        options: s.revealed.options,
+        answerIndex: o.answerIndex,
+        difficulty: 'medium',
+      };
+      const total = o.total ?? s.total + o.points;
+      const answer: AnswerRecord = {
+        questionId: question.id,
+        call: s.call,
+        choice: o.choice,
+        correct: o.correct,
+        msLeft: o.msLeft,
+        points: o.points,
+        total,
+      };
+      const answers = [...s.answers, answer];
+      const triggered = questionMoments(answers);
+      return {
+        ...s,
+        phase: 'result',
+        questions: [...s.questions, question],
+        answers,
+        total,
+        moments: [...s.moments, triggered],
+        spotlight: featured(triggered, { chill: s.chill }),
+      };
+    }
     case 'NEXT': {
       if (s.phase !== 'result') return s;
       const index = s.index + 1;
-      if (index < s.questions.length) {
-        return { ...s, index, phase: 'call', call: null, shownAt: null, spotlight: null };
-      }
+      const cleared = { call: null, shownAt: null, revealed: null, teaser: null, spotlight: null };
+      if (index < s.questionCount) return { ...s, ...cleared, index, phase: 'call' };
       const endMoments = runMoments(s.answers, {
-        questionCount: s.questions.length,
+        questionCount: s.questionCount,
         dayStreak: a.dayStreak,
         isNewNumberOne: a.isNewNumberOne,
       });
-      return { ...s, index, phase: 'summary', call: null, shownAt: null, endMoments, spotlight: featured(endMoments, { chill: s.chill }) };
+      return { ...s, ...cleared, index, phase: 'summary', endMoments, spotlight: featured(endMoments, { chill: s.chill }) };
     }
     case 'QUIT':
       // Leaving ends the run: unanswered questions simply score nothing.
-      return { ...s, phase: 'summary', call: null, shownAt: null, spotlight: null };
+      return { ...s, phase: 'summary', call: null, shownAt: null, revealed: null, spotlight: null };
     default:
       return s;
   }
 }
 
+/** Wordle-style row of squares: one per question. */
+export function gridFor(answers: readonly Pick<AnswerRecord, 'call' | 'correct'>[], questionCount: number): string {
+  const glyph: Record<Call, [string, string]> = {
+    safe: ['🟦', '⬜'],
+    sure: ['🟩', '🟥'],
+    allin: ['🟪', '💀'],
+  };
+  return Array.from({ length: questionCount }, (_, i) => {
+    const a = answers[i];
+    return a ? glyph[a.call][a.correct ? 0 : 1] : '▫️';
+  }).join('');
+}
+
+export function shareGrid(s: RunState): string {
+  return gridFor(s.answers, s.questionCount);
+}
+
 /** Short summary numbers for the summary screen and share card. */
-export function runStats(s: RunState) {
+export function runStats(s: Pick<RunState, 'answers' | 'moments' | 'endMoments' | 'questionCount' | 'total'>) {
   const correct = s.answers.filter((a) => a.correct).length;
   const allins = s.answers.filter((a) => a.call === 'allin');
   const allMoments = [...s.moments.flat(), ...s.endMoments];
@@ -139,26 +169,11 @@ export function runStats(s: RunState) {
     total: s.total,
     correct,
     answered: s.answers.length,
-    questionCount: s.questions.length,
+    questionCount: s.questionCount,
     allinHits: allins.filter((a) => a.correct).length,
     allinCount: allins.length,
     bestStreak,
     allMoments,
     biggest: featured(allMoments),
   };
-}
-
-/** Wordle-style row of squares: one per question. */
-export function shareGrid(s: RunState): string {
-  const glyph: Record<Call, [string, string]> = {
-    safe: ['🟦', '⬜'],
-    sure: ['🟩', '🟥'],
-    allin: ['🟪', '💀'],
-  };
-  const cells = s.questions.map((_, i) => {
-    const a = s.answers[i];
-    if (!a) return '▫️';
-    return glyph[a.call][a.correct ? 0 : 1];
-  });
-  return cells.join('');
 }

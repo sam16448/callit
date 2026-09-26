@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { nextDayStreak } from '@/game/time';
 import { KEYS, loadJson, removeKey, saveJson } from '@/lib/storage';
+import { syncProfile } from '@/services/api';
+import { ONLINE, supabase } from '@/services/supabase';
 
 export type Profile = {
   nickname: string;
@@ -34,13 +36,18 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     loadJson<Profile>(KEYS.profile).then((p) => {
       setProfile(p);
       setLoaded(true);
+      if (p && ONLINE) syncProfile(p.nickname, p.avatar).catch(() => {});
     });
   }, []);
 
-  const commit = useCallback((next: Profile | null) => {
+  const commit = useCallback((next: Profile | null, prev?: Profile | null) => {
     setProfile(next);
     if (next) saveJson(KEYS.profile, next);
     else removeKey(KEYS.profile);
+    // Keep the server's copy of the nickname and avatar in step.
+    if (next && ONLINE && (next.nickname !== prev?.nickname || next.avatar !== prev?.avatar)) {
+      syncProfile(next.nickname, next.avatar).catch(() => {});
+    }
   }, []);
 
   const create = useCallback(
@@ -49,13 +56,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
-  const update = useCallback<ProfileCtx['update']>((patch) => profile && commit({ ...profile, ...patch }), [profile, commit]);
+  const update = useCallback<ProfileCtx['update']>((patch) => profile && commit({ ...profile, ...patch }, profile), [profile, commit]);
 
   const recordPlay = useCallback(
     (day: string) => {
       if (!profile) return 0;
       const dayStreak = nextDayStreak(profile.lastPlayedDay, profile.dayStreak, day);
-      commit({ ...profile, dayStreak, bestDayStreak: Math.max(profile.bestDayStreak, dayStreak), lastPlayedDay: day });
+      commit({ ...profile, dayStreak, bestDayStreak: Math.max(profile.bestDayStreak, dayStreak), lastPlayedDay: day }, profile);
       return dayStreak;
     },
     [profile, commit],
@@ -64,6 +71,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const reset = useCallback(() => {
     commit(null);
     removeKey(KEYS.runs);
+    // Online: start as a brand-new anonymous player.
+    supabase?.auth.signOut().catch(() => {});
   }, [commit]);
 
   const value = useMemo(() => ({ loaded, profile, create, update, recordPlay, reset }), [loaded, profile, create, update, recordPlay, reset]);

@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Pill, Screen, SectionLabel, tapLight } from '@/components/ui';
 import { BOARDS, boardById, type Board } from '@/game/boards';
 import { formatCountdown, msUntilNextRun, utcDay } from '@/game/time';
 import { formatPoints } from '@/lib/format';
+import { api, type TodayRow } from '@/services/api';
 import { isBoardPlayable } from '@/services/questions';
+import { ONLINE } from '@/services/supabase';
 import { useProfile } from '@/state/profile';
 import { useRuns } from '@/state/runs';
 import { C, F, R, S, T } from '@/theme';
@@ -25,13 +27,41 @@ function openRun(board: Board) {
   router.push({ pathname: '/run/[board]', params: { board: board.id } });
 }
 
+/** Today's runs on the server (online), so runs from before a reinstall still show. */
+function useServerToday() {
+  const [rows, setRows] = useState<TodayRow[]>([]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!ONLINE) return;
+      let live = true;
+      api
+        .today()
+        .then((r) => live && setRows(r))
+        .catch(() => {});
+      return () => {
+        live = false;
+      };
+    }, []),
+  );
+  return rows;
+}
+
 export default function Play() {
   const { profile } = useProfile();
   const { get } = useRuns();
+  const server = useServerToday();
   const now = useNow(30_000);
   const day = utcDay(now);
   const mixed = boardById('mixed')!;
-  const mixedRun = get(day, 'mixed');
+  /** Local record first; otherwise what the server knows. */
+  const status = (id: Board['id']) => {
+    const local = get(day, id);
+    const remote = server.find((r) => r.board === id);
+    if (local?.status === 'done' || remote?.finished) return { state: 'done' as const, total: local?.total ?? remote?.total ?? 0, grid: local?.grid };
+    if (local || remote) return { state: 'paused' as const, total: remote?.total ?? local?.total ?? 0, grid: local?.grid };
+    return null;
+  };
+  const mixedRun = status('mixed');
   const categories = BOARDS.filter((b) => b.id !== 'mixed');
 
   return (
@@ -57,11 +87,11 @@ export default function Play() {
         {mixedRun ? (
           <View style={styles.done}>
             <View style={{ flex: 1 }}>
-              <Text style={[T.label, { color: C.muted }]}>{mixedRun.status === 'done' ? 'Your score' : 'Run ended early'}</Text>
+              <Text style={[T.label, { color: C.muted }]}>{mixedRun.state === 'done' ? 'Your score' : 'Paused at'}</Text>
               <Text style={styles.doneScore}>{formatPoints(mixedRun.total)}</Text>
-              <Text style={styles.grid}>{mixedRun.grid}</Text>
+              {mixedRun.grid ? <Text style={styles.grid}>{mixedRun.grid}</Text> : null}
             </View>
-            <Button title="Recap" variant="subtle" onPress={() => openRun(mixed)} />
+            <Button title={mixedRun.state === 'done' ? 'Recap' : 'Continue'} variant="subtle" onPress={() => openRun(mixed)} />
           </View>
         ) : (
           <View style={{ marginTop: S.lg }}>
@@ -79,7 +109,7 @@ export default function Play() {
       <View style={styles.tiles}>
         {categories.map((b) => {
           const playable = isBoardPlayable(b.id);
-          const rec = get(day, b.id);
+          const rec = status(b.id);
           return (
             <Pressable
               key={b.id}
@@ -94,13 +124,15 @@ export default function Play() {
                 {b.name}
               </Text>
               <Text style={[styles.tileMeta, rec && { color: C.accent }]} numberOfLines={1}>
-                {rec ? formatPoints(rec.total) : playable ? 'Play' : 'Soon'}
+                {rec ? (rec.state === 'done' ? formatPoints(rec.total) : 'Continue') : playable ? 'Play' : 'Soon'}
               </Text>
             </Pressable>
           );
         })}
       </View>
-      <Text style={styles.foot}>Offline preview: six categories run on bundled sample questions. All 16 boards go live when the question bank is connected.</Text>
+      {ONLINE ? null : (
+        <Text style={styles.foot}>Offline demo: six categories run on bundled sample questions. Add Supabase keys to open all 16 boards.</Text>
+      )}
     </Screen>
   );
 }

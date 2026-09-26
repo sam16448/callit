@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { BackHandler, Share, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, BackHandler, Share, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { CallPicker } from '@/components/CallPicker';
 import { CallTag } from '@/components/CallTag';
@@ -11,15 +11,16 @@ import { RunSummary } from '@/components/RunSummary';
 import { TimerBar } from '@/components/TimerBar';
 import { BackBar, Button, Card, Pill, Screen } from '@/components/ui';
 import { boardById, type Board } from '@/game/boards';
+import type { RunDriver } from '@/game/driver';
 import type { MomentId } from '@/game/moments';
-import { currentQuestion, runReducer, startRun } from '@/game/run';
+import { runReducer, startRun, type RunAction, type RunState } from '@/game/run';
 import { QUESTION_MS, clampMsLeft } from '@/game/scoring';
-import { teaserFor } from '@/game/teaser';
 import { nextDayStreak, utcDay } from '@/game/time';
-import type { Call, Question } from '@/game/types';
+import type { Call } from '@/game/types';
 import { formatPoints } from '@/lib/format';
-import { recordFromRun, shareText } from '@/lib/share';
-import { isBoardPlayable, loadDailyRun } from '@/services/questions';
+import { recordFromRecap, recordFromRun, shareText } from '@/lib/share';
+import { ApiError } from '@/services/api';
+import { createDriver, isBoardPlayable } from '@/services/questions';
 import { useProfile } from '@/state/profile';
 import { useRuns, type RunRecord } from '@/state/runs';
 import { CALL_COLOR, C, F, R, S, T } from '@/theme';
@@ -42,6 +43,10 @@ async function shareRun(record: RunRecord, boardName: string) {
   }
 }
 
+function messageOf(e: unknown): string {
+  return e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong.';
+}
+
 export default function RunScreen() {
   const params = useLocalSearchParams<{ board: string }>();
   const board = boardById(String(params.board ?? ''));
@@ -61,20 +66,24 @@ function Run({ board }: { board: Board }) {
   const { profile, recordPlay } = useProfile();
   const { get, save } = useRuns();
   const [day] = useState(() => utcDay());
-  const questions = useMemo(() => loadDailyRun(board.id, day), [board.id, day]);
+  const driver = useMemo(() => createDriver(board.id, day), [board.id, day]);
   // What was saved when the screen opened: one attempt per board per day.
   const [savedAtOpen] = useState(() => get(day, board.id));
+  const [finished, setFinished] = useState<RunRecord | null>(null);
 
-  if (savedAtOpen) return <Recap board={board} questions={questions} saved={savedAtOpen} onSave={save} onFinish={recordPlay} />;
+  const recap = finished ?? (savedAtOpen && (savedAtOpen.status === 'done' || driver.mode === 'offline') ? savedAtOpen : null);
+  if (recap) return <Recap board={board} saved={recap} onSave={save} onFinish={recordPlay} />;
+
   return (
     <LiveRun
       board={board}
       day={day}
-      questions={questions}
+      driver={driver}
       chill={Boolean(profile?.chill)}
       nextStreak={profile && profile.lastPlayedDay !== day ? nextDayStreak(profile.lastPlayedDay, profile.dayStreak, day) : undefined}
       onSave={save}
       onFinish={recordPlay}
+      onAlreadyFinished={setFinished}
     />
   );
 }
@@ -82,18 +91,16 @@ function Run({ board }: { board: Board }) {
 /** Reopening a run you already played: show the recap, never a second attempt. */
 function Recap({
   board,
-  questions,
   saved,
   onSave,
   onFinish,
 }: {
   board: Board;
-  questions: Question[];
   saved: RunRecord;
   onSave: (r: RunRecord) => void;
   onFinish: (day: string) => number;
 }) {
-  // A run left half-way (app closed) still counts: close it out once.
+  // An offline run left half-way (app closed) still counts: close it out once.
   const closed = useRef(false);
   useEffect(() => {
     if (saved.status !== 'in_progress' || closed.current) return;
@@ -103,82 +110,197 @@ function Recap({
   }, [saved, onSave, onFinish]);
 
   return (
-    <Screen
-      footer={
-        <View style={styles.footerRow}>
-          <View style={{ flex: 1 }}>
-            <Button title="Share" icon="share-outline" variant="subtle" onPress={() => shareRun(saved, board.name)} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button title="Done" onPress={leave} />
-          </View>
-        </View>
-      }
-    >
+    <Screen footer={<SummaryButtons record={saved} boardName={board.name} />}>
       <BackBar onBack={leave} close title={`${board.name} · today`} />
       <Text style={styles.already}>You&apos;ve played today&apos;s {board.name} run. New runs every day at 00:00 UTC (5:30 AM IST).</Text>
-      <RunSummary record={saved} questions={questions} boardName={board.name} />
+      <RunSummary record={saved} boardName={board.name} />
     </Screen>
   );
 }
 
+function SummaryButtons({ record, boardName }: { record: RunRecord; boardName: string }) {
+  return (
+    <View style={styles.footerRow}>
+      <View style={{ flex: 1 }}>
+        <Button title="Share" icon="share-outline" variant="subtle" onPress={() => shareRun(record, boardName)} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Button title="Done" onPress={leave} />
+      </View>
+    </View>
+  );
+}
+
+type Stage = 'checking' | 'intro' | 'running' | 'error';
+
 function LiveRun({
   board,
   day,
-  questions,
+  driver,
   chill,
   nextStreak,
   onSave,
   onFinish,
+  onAlreadyFinished,
 }: {
   board: Board;
   day: string;
-  questions: Question[];
+  driver: RunDriver;
   chill: boolean;
   nextStreak: number | undefined;
   onSave: (r: RunRecord) => void;
   onFinish: (day: string) => number;
+  onAlreadyFinished: (r: RunRecord) => void;
 }) {
-  const [started, setStarted] = useState(false);
-  const [state, dispatch] = useReducer(runReducer, undefined, () => startRun(questions, { chill }));
+  const [stage, setStage] = useState<Stage>('checking');
+  const [resuming, setResuming] = useState(0);
+  const [error, setError] = useState<{ message: string; retry: () => void } | null>(null);
+  const [run, setRun] = useState<RunState | null>(null);
+  const [busy, setBusy] = useState(false);
   const [msLeft, setMsLeft] = useState(QUESTION_MS);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [confirmQuit, setConfirmQuit] = useState(false);
-  const finished = useRef(false);
-  const q = currentQuestion(state);
-  const inRun = started && state.phase !== 'summary';
+  const [finalRecord, setFinalRecord] = useState<RunRecord | null>(null);
+  const busyRef = useRef(false);
+  const finishedRef = useRef(false);
+  const recapRequested = useRef(false);
 
-  // Save after every step, so closing the app mid-run still uses up the attempt.
-  useEffect(() => {
-    if (!started) return;
-    const done = state.phase === 'summary';
-    onSave(recordFromRun(state, day, board.id, done ? 'done' : 'in_progress'));
-    if (done && !finished.current) {
-      finished.current = true;
-      onFinish(day);
+  const dispatch = useCallback((a: RunAction) => setRun((s) => (s ? runReducer(s, a) : s)), []);
+
+  /** Runs one server/driver step, with a busy guard and an error that retries the same step. */
+  const step = useCallback(async function runStep(fn: () => Promise<void>): Promise<void> {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await fn();
+      setError(null);
+    } catch (e) {
+      setError({ message: messageOf(e), retry: () => runStep(fn) });
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
     }
-  }, [started, state, day, board.id, onSave, onFinish]);
+  }, []);
 
-  // One moment per question (and one for the end of the run), until tapped away.
-  const momentKey = `${state.answers.length}-${state.phase}`;
-  const moment: MomentId | null = dismissed === momentKey ? null : state.spotlight;
+  const loadFinished = useCallback(async () => {
+    const items = await driver.recap();
+    const rec = recordFromRecap(items, day, board.id, items.length || board.runLength);
+    onSave(rec);
+    onAlreadyFinished(rec);
+  }, [driver, day, board, onSave, onAlreadyFinished]);
 
-  // The clock. Time left comes from timestamps, the interval only redraws.
+  // Opening the screen: new, half-way (resume) or already finished elsewhere?
+  const check = useCallback(
+    () =>
+      step(async () => {
+        const p = await driver.peek();
+        if (p.state === 'finished') return loadFinished();
+        setResuming(p.state === 'in_progress' ? p.answered : 0);
+        setStage('intro');
+      }),
+    [driver, step, loadFinished],
+  );
+
   useEffect(() => {
-    if (state.phase !== 'question' || state.shownAt === null) return;
-    const shownAt = state.shownAt;
+    check();
+  }, [check]);
+
+  const begin = () =>
+    step(async () => {
+      const s = await driver.start();
+      if (s.status === 'finished') return loadFinished();
+      setRun(startRun(s.questionCount, { chill, startIndex: s.startIndex, startTotal: s.total }));
+      setStage('running');
+    });
+
+  // Load each teaser. If the call was already made (reconnect), reveal straight away.
+  const index = run?.index;
+  const needsTeaser = run?.phase === 'call' && !run.teaser;
+  const loadTeaser = useCallback(
+    (i: number) =>
+      step(async () => {
+        const t = await driver.teaser(i);
+        dispatch({ type: 'TEASER', teaser: { teaser: t.teaser, category: t.category } });
+        if (t.call) {
+          const r = await driver.call(i, t.call);
+          dispatch({ type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
+        }
+      }),
+    [driver, step, dispatch],
+  );
+  // Waits for the previous step to finish (busy), otherwise the load would be dropped.
+  const hasError = Boolean(error);
+  useEffect(() => {
+    if (needsTeaser && index !== undefined && !busy && !hasError) loadTeaser(index);
+  }, [needsTeaser, index, busy, hasError, loadTeaser]);
+
+  const place = (call: Call) => {
+    if (!run) return;
+    const i = run.index;
+    step(async () => {
+      const r = await driver.call(i, call);
+      setMsLeft(QUESTION_MS);
+      dispatch({ type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
+    });
+  };
+
+  const submit = useCallback(
+    (i: number, choice: number | null) =>
+      step(async () => {
+        const outcome = await driver.answer(i, choice);
+        dispatch({ type: 'ANSWERED', outcome });
+      }),
+    [driver, step, dispatch],
+  );
+
+  // The clock. Time left comes from timestamps; the interval only redraws.
+  const phase = run?.phase;
+  const shownAt = run?.shownAt ?? null;
+  useEffect(() => {
+    if (phase !== 'question' || shownAt === null || index === undefined) return;
+    let sent = false;
     const tick = () => {
-      const now = Date.now();
-      const left = clampMsLeft(QUESTION_MS - (now - shownAt));
+      const left = clampMsLeft(QUESTION_MS - (nowMs() - shownAt));
       setMsLeft(left);
-      if (left <= 0) dispatch({ type: 'TIMEOUT', now });
+      if (left <= 0 && !sent) {
+        sent = true;
+        submit(index, null);
+      }
     };
     tick();
     const id = setInterval(tick, 100);
     return () => clearInterval(id);
-  }, [state.phase, state.shownAt]);
+  }, [phase, shownAt, index, submit]);
 
-  // Android back button: ask before ending a run.
+  // Save after every step, so the Play tab knows where you are.
+  useEffect(() => {
+    if (!run || run.answers.length === 0 || finalRecord) return;
+    const done = run.phase === 'summary';
+    onSave(recordFromRun(run, day, board.id, done ? 'done' : 'in_progress'));
+    if (!done) return;
+    if (driver.mode === 'online' && run.index >= run.questionCount && !recapRequested.current) {
+      // Online and complete: the server's recap is the source of truth (covers resumed runs too).
+      recapRequested.current = true;
+      driver
+        .recap()
+        .then((items) => {
+          const full = recordFromRecap(items, day, board.id, run.questionCount, { dayStreak: nextStreak });
+          onSave(full);
+          setFinalRecord(full);
+        })
+        .catch(() => {});
+    }
+    // The streak counts a finished run (or an offline run ended early, which can't be resumed).
+    if (!finishedRef.current && (driver.mode === 'offline' || run.index >= run.questionCount)) {
+      finishedRef.current = true;
+      onFinish(day);
+    }
+  }, [run, day, board.id, driver, onSave, onFinish, finalRecord, nextStreak]);
+
+  const inRun = stage === 'running' && run?.phase !== 'summary';
+
+  // Android back button: ask before leaving a run.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!inRun) return false;
@@ -188,82 +310,92 @@ function LiveRun({
     return () => sub.remove();
   }, [inRun]);
 
-  const onClose = () => (inRun ? setConfirmQuit(true) : leave());
-  const place = (call: Call) => {
-    setMsLeft(QUESTION_MS);
-    dispatch({ type: 'PLACE_CALL', call, now: nowMs() });
-  };
-  const answer = (choice: number) => dispatch({ type: 'ANSWER', choice, now: nowMs() });
-  const next = () => dispatch({ type: 'NEXT', dayStreak: nextStreak });
+  const momentKey = `${run?.answers.length ?? 0}-${run?.phase ?? ''}`;
+  const moment: MomentId | null = run && dismissed !== momentKey ? run.spotlight : null;
   const clearMoment = useCallback(() => setDismissed(momentKey), [momentKey]);
 
-  const progress = `${Math.min(state.index + 1, questions.length)}/${questions.length}`;
+  const onClose = () => (inRun ? setConfirmQuit(true) : leave());
+  const next = () => dispatch({ type: 'NEXT', dayStreak: nextStreak });
+
   const header = (
     <BackBar
       onBack={onClose}
       close
-      title={started && state.phase !== 'summary' ? `${board.name} · ${progress}` : board.name}
-      right={started ? <Pill text={`${formatPoints(state.total)} pts`} color={C.text} filled={C.surfaceHi} /> : undefined}
+      title={run && run.phase !== 'summary' ? `${board.name} · ${Math.min(run.index + 1, run.questionCount)}/${run.questionCount}` : board.name}
+      right={run ? <Pill text={`${formatPoints(run.total)} pts`} color={C.text} filled={C.surfaceHi} /> : undefined}
     />
   );
 
-  let body: React.ReactNode;
+  let body: React.ReactNode = null;
   let footer: React.ReactNode = null;
 
-  if (!started) {
+  if (stage === 'checking') {
+    body = <Loading />;
+  } else if (stage === 'intro') {
     body = (
       <Animated.View entering={FadeIn.duration(250)}>
         <Text style={styles.introEmoji}>{board.emoji}</Text>
         <Text style={styles.introTitle}>{board.id === 'mixed' ? "Today's Mixed run" : `Today's ${board.name} run`}</Text>
         <Text style={styles.introSub}>
-          {questions.length} questions · 15 seconds each · one attempt{board.id === 'mixed' ? ' · global board' : ' · weekly board'}
+          {board.runLength} questions · 15 seconds each · one attempt{board.id === 'mixed' ? ' · global board' : ' · weekly board'}
         </Text>
-        <Card style={{ marginTop: S.xl, gap: S.lg }}>
-          <Rule icon="eye-outline" text="You see the opening words of each question first." />
-          <Rule icon="flash-outline" text="Then call it: Safe 1×, Sure 2× or All-in 3×. Wrong calls cost points." />
-          <Rule icon="timer-outline" text="The options appear and the 15-second clock starts. Faster = up to +50 bonus." />
-          <Rule icon="lock-closed-outline" text="Once you start, this is your one attempt for today." />
-        </Card>
+        {resuming > 0 ? (
+          <Card style={{ marginTop: S.xl }}>
+            <Text style={[T.bodyStrong, { color: C.text }]}>You&apos;re {resuming} questions in</Text>
+            <Text style={[T.small, { color: C.muted, marginTop: 4 }]}>Pick up where you left off. A question that was showing when you left counts as a timeout.</Text>
+          </Card>
+        ) : (
+          <Card style={{ marginTop: S.xl, gap: S.lg }}>
+            <Rule icon="eye-outline" text="You see the opening words of each question first." />
+            <Rule icon="flash-outline" text="Then call it: Safe 1×, Sure 2× or All-in 3×. Wrong calls cost points." />
+            <Rule icon="timer-outline" text="The options appear and the 15-second clock starts. Faster = up to +50 bonus." />
+            <Rule icon="lock-closed-outline" text="Once you start, this is your one attempt for today." />
+          </Card>
+        )}
       </Animated.View>
     );
-    footer = <Button title="Start run" icon="play" onPress={() => setStarted(true)} />;
-  } else if (state.phase === 'summary') {
-    const record = recordFromRun(state, day, board.id, 'done');
-    body = <RunSummary record={record} questions={questions} boardName={board.name} />;
-    footer = (
-      <View style={styles.footerRow}>
-        <View style={{ flex: 1 }}>
-          <Button title="Share" icon="share-outline" variant="subtle" onPress={() => shareRun(record, board.name)} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button title="Done" onPress={leave} />
-        </View>
-      </View>
-    );
-  } else if (q && state.phase === 'call') {
+    footer = <Button title={resuming > 0 ? 'Continue run' : 'Start run'} icon="play" loading={busy} onPress={begin} />;
+  } else if (run && run.phase === 'summary') {
+    const record = finalRecord ?? recordFromRun(run, day, board.id, 'done');
     body = (
-      <Animated.View key={`call-${state.index}`} entering={FadeInDown.duration(260)}>
-        <Dots total={questions.length} index={state.index} answers={state.answers.map((a) => a.correct)} />
-        <Text style={[T.label, { color: C.muted, marginTop: S.xl }]}>{categoryLabel(q)}</Text>
+      <>
+        {run.answers.length < run.questionCount && driver.mode === 'online' ? (
+          <Text style={styles.already}>Run paused. Come back before 00:00 UTC to finish it.</Text>
+        ) : null}
+        <RunSummary record={record} boardName={board.name} />
+      </>
+    );
+    footer = <SummaryButtons record={record} boardName={board.name} />;
+  } else if (run && run.phase === 'call') {
+    body = run.teaser ? (
+      <Animated.View key={`call-${run.index}`} entering={FadeInDown.duration(260)}>
+        <Dots total={run.questionCount} index={run.index} answers={run.answers.map((a) => a.correct)} offset={run.index - run.answers.length} />
+        <Text style={[T.label, { color: C.muted, marginTop: S.xl }]}>{categoryLabel(run.teaser.category)}</Text>
         <Card style={styles.teaserCard}>
-          <Text style={styles.teaser}>“{teaserFor(q)}”</Text>
+          <Text style={styles.teaser}>“{run.teaser.teaser}”</Text>
         </Card>
         <Text style={styles.callPrompt}>Make your call</Text>
-        <CallPicker onCall={place} />
+        <View pointerEvents={busy ? 'none' : 'auto'} style={busy ? { opacity: 0.6 } : undefined}>
+          <CallPicker onCall={place} />
+        </View>
       </Animated.View>
+    ) : (
+      <Loading />
     );
-  } else if (q && state.call && (state.phase === 'question' || state.phase === 'result')) {
-    const last = state.phase === 'result' ? state.answers[state.answers.length - 1] : undefined;
+  } else if (run && run.call && run.revealed && run.teaser && (run.phase === 'question' || run.phase === 'result')) {
+    const last = run.phase === 'result' ? run.answers[run.answers.length - 1] : undefined;
+    const q = run.phase === 'result' ? run.questions[run.questions.length - 1] : undefined;
     const optionState = (i: number): OptionState => {
-      if (!last) return 'idle';
+      if (!last || !q) return 'idle';
       if (i === q.answerIndex) return 'correct';
       if (i === last.choice) return 'wrong';
       return 'dim';
     };
+    const i = run.index;
     body = (
       <View>
-        {state.phase === 'question' ? (
-          <TimerBar msLeft={msLeft} running color={CALL_COLOR[state.call].main} />
+        {run.phase === 'question' ? (
+          <TimerBar msLeft={msLeft} running color={CALL_COLOR[run.call].main} />
         ) : last ? (
           <Animated.View entering={FadeIn.duration(200)} style={styles.resultRow}>
             <Text style={[styles.resultWord, { color: last.correct ? C.good : C.bad }]}>
@@ -275,36 +407,52 @@ function LiveRun({
           </Animated.View>
         ) : null}
         <View style={styles.qMeta}>
-          <CallTag call={state.call} size="md" />
-          <Text style={[T.label, { color: C.faint }]}>{categoryLabel(q)}</Text>
+          <CallTag call={run.call} size="md" />
+          <Text style={[T.label, { color: C.faint }]}>{categoryLabel(run.teaser.category)}</Text>
         </View>
-        <Text style={styles.prompt}>{q.prompt}</Text>
+        <Text style={styles.prompt}>{run.revealed.prompt}</Text>
         <View style={{ gap: S.sm, marginTop: S.xl }}>
-          {q.options.map((opt, i) => (
-            <OptionButton key={i} index={i} text={opt} state={optionState(i)} disabled={state.phase !== 'question'} onPress={() => answer(i)} />
+          {run.revealed.options.map((opt, oi) => (
+            <OptionButton
+              key={oi}
+              index={oi}
+              text={opt}
+              state={optionState(oi)}
+              disabled={run.phase !== 'question' || busy}
+              onPress={() => submit(i, oi)}
+            />
           ))}
         </View>
+        {busy && run.phase === 'question' ? <Text style={styles.checking}>Checking…</Text> : null}
       </View>
     );
-    if (state.phase === 'result') {
-      const lastQ = state.index === questions.length - 1;
+    if (run.phase === 'result') {
+      const lastQ = run.index === run.questionCount - 1;
       footer = <Button title={lastQ ? 'See results' : 'Next question'} icon={lastQ ? 'trophy-outline' : 'arrow-forward'} onPress={next} />;
     }
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <Screen footer={footer}>
+      <Screen footer={error ? <Button title="Try again" icon="refresh" onPress={error.retry} /> : footer}>
         {header}
+        {error ? (
+          <Card style={styles.errorCard}>
+            <Ionicons name="cloud-offline-outline" size={20} color={C.bad} />
+            <Text style={styles.errorText}>{error.message}</Text>
+          </Card>
+        ) : null}
         {body}
       </Screen>
       {moment ? <MomentOverlay key={`${moment}-${momentKey}`} id={moment} chill={chill} onDone={clearMoment} /> : null}
       {confirmQuit ? (
         <View style={styles.scrim}>
           <Card style={styles.confirm}>
-            <Text style={[T.h2, { color: C.text }]}>End this run?</Text>
+            <Text style={[T.h2, { color: C.text }]}>{driver.mode === 'online' ? 'Pause this run?' : 'End this run?'}</Text>
             <Text style={[T.body, { color: C.muted, marginTop: S.sm }]}>
-              It still counts as today&apos;s attempt. Questions you haven&apos;t answered score 0. The clock keeps running while you decide.
+              {driver.mode === 'online'
+                ? 'You can finish it later today. If a question is showing, the clock keeps running and it counts as a timeout.'
+                : "It still counts as today's attempt. Questions you haven't answered score 0. The clock keeps running while you decide."}
             </Text>
             <View style={[styles.footerRow, { marginTop: S.xl }]}>
               <View style={{ flex: 1 }}>
@@ -312,12 +460,13 @@ function LiveRun({
               </View>
               <View style={{ flex: 1 }}>
                 <Button
-                  title="End run"
+                  title={driver.mode === 'online' ? 'Leave' : 'End run'}
                   color={C.bad}
                   ink="#2A0008"
                   onPress={() => {
                     setConfirmQuit(false);
-                    dispatch({ type: 'QUIT' });
+                    if (driver.mode === 'online') leave();
+                    else dispatch({ type: 'QUIT' });
                   }}
                 />
               </View>
@@ -329,9 +478,17 @@ function LiveRun({
   );
 }
 
-function categoryLabel(q: Question): string {
-  const b = boardById(q.category);
-  return b ? `${b.emoji}  ${b.name}` : q.category;
+function Loading() {
+  return (
+    <View style={styles.loading}>
+      <ActivityIndicator color={C.accent} />
+    </View>
+  );
+}
+
+function categoryLabel(category: string): string {
+  const b = boardById(category);
+  return b ? `${b.emoji}  ${b.name}` : category;
 }
 
 function Rule({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
@@ -343,27 +500,33 @@ function Rule({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['nam
   );
 }
 
-/** Progress dots: green right, red wrong, outlined current. */
-function Dots({ total, index, answers }: { total: number; index: number; answers: boolean[] }) {
+/** Progress dots: green right, red wrong, grey answered earlier (resumed), outlined current. */
+function Dots({ total, index, answers, offset }: { total: number; index: number; answers: boolean[]; offset: number }) {
   return (
     <View style={styles.dots} accessibilityLabel={`Question ${index + 1} of ${total}`}>
-      {Array.from({ length: total }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.dot,
-            i < answers.length && { backgroundColor: answers[i] ? C.good : C.bad, borderColor: 'transparent' },
-            i === index && { borderColor: C.accent, width: 22 },
-          ]}
-        />
-      ))}
+      {Array.from({ length: total }, (_, i) => {
+        // Questions answered before a resume aren't in `answers`: they show grey.
+        const a = i >= offset ? answers[i - offset] : undefined;
+        const before = i < index;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+              before && { backgroundColor: a === undefined ? C.faint : a ? C.good : C.bad, borderColor: 'transparent' },
+              i === index && { borderColor: C.accent, width: 22 },
+            ]}
+          />
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: S.md },
-  already: { ...T.small, color: C.muted, textAlign: 'center' },
+  already: { ...T.small, color: C.muted, textAlign: 'center', marginBottom: S.sm },
+  loading: { paddingVertical: 80, alignItems: 'center' },
   introEmoji: { fontSize: 56, marginTop: S.lg },
   introTitle: { ...T.h1, color: C.text, marginTop: S.md },
   introSub: { ...T.body, color: C.muted, marginTop: S.xs },
@@ -379,6 +542,9 @@ const styles = StyleSheet.create({
   resultRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   resultWord: { fontFamily: F.display, fontSize: 32 },
   resultPts: { fontFamily: F.display, fontSize: 32 },
+  checking: { ...T.small, color: C.muted, textAlign: 'center', marginTop: S.md },
+  errorCard: { flexDirection: 'row', alignItems: 'center', gap: S.md, padding: S.lg, marginBottom: S.lg, borderColor: C.bad },
+  errorText: { flex: 1, color: C.text, fontFamily: F.medium, fontSize: 14 },
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.scrim, justifyContent: 'center', padding: S.xl, zIndex: 30 },
   confirm: { borderRadius: R.xl },
 });
