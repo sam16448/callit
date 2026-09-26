@@ -42,3 +42,6 @@ yarn-error.*
 
 # secrets
 .env
+
+# question import cache (re-downloadable from opentdb.com)
+data/questions/opentdb-raw.json

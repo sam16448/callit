@@ -195,7 +195,8 @@ begin
 end $$;
 
 -- Picks (once) and returns the day's questions for a board. Everyone gets the
--- same list because it is stored. Recently used questions are avoided.
+-- same list because it is stored. Questions used in the last 60 days are
+-- avoided while there are enough others, so small boards never run dry.
 create or replace function public.ensure_daily_set(p_board text, p_day date)
 returns bigint[]
 language plpgsql
@@ -216,8 +217,9 @@ begin
         select distinct on (q.board) q.id, q.board
         from questions q
         where q.active
-          and not exists (select 1 from daily_sets d where d.day > p_day - 60 and q.id = any (d.question_ids))
-        order by q.board, random()
+        order by q.board,
+          exists (select 1 from daily_sets d where d.day > p_day - 60 and q.id = any (d.question_ids)),
+          random()
       ) per_board
       order by random()
       limit n
@@ -226,8 +228,9 @@ begin
     select array_agg(id) into ids from (
       select q.id from questions q
       where q.active and q.board = p_board
-        and not exists (select 1 from daily_sets d where d.day > p_day - 60 and q.id = any (d.question_ids))
-      order by random()
+      order by
+        exists (select 1 from daily_sets d where d.day > p_day - 60 and q.id = any (d.question_ids)),
+        random()
       limit n
     ) picked;
   end if;

@@ -222,6 +222,18 @@ describe('daily sets', () => {
     expect(rows[0]).toEqual({ n: 10, boards: 10 });
   });
 
+  it('avoids repeats while it can, then reuses questions instead of failing', async () => {
+    // tech has 20 questions, 5 per day: 4 fresh days, then it must reuse.
+    const days = ['2030-01-01', '2030-01-02', '2030-01-03', '2030-01-04', '2030-01-05'];
+    const sets: number[][] = [];
+    for (const d of days) {
+      const rows = (await db.query<{ ids: number[] }>('select public.ensure_daily_set($1, $2::date) as ids', ['tech', d])).rows;
+      sets.push(rows[0].ids.map(Number));
+    }
+    expect(new Set(sets.slice(0, 4).flat()).size).toBe(20);
+    expect(sets[4]).toHaveLength(5);
+  });
+
   it('rejects unknown boards', async () => {
     await expectError(rpc(C, 'get_teaser', ['casino', 0]), /unknown board/);
   });
