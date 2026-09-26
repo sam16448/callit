@@ -142,8 +142,8 @@ function readEnvUrl(): string {
 async function upload(rows: QuestionRow[]) {
   const url = readEnvUrl();
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  console.log('\nSupabase > Project Settings > API Keys > service_role (secret). It is used for this upload only and not saved.');
-  const key = (await rl.question('Paste the service_role key and press Enter: ')).trim();
+  console.log('\nSupabase > Project Settings > API Keys > Secret key (sb_secret_…), or the legacy service_role key. Used for this upload only, never saved.');
+  const key = (await rl.question('Paste the secret key and press Enter: ')).trim();
   rl.close();
   if (!key) throw new Error('No key given.');
 
@@ -153,7 +153,8 @@ async function upload(rows: QuestionRow[]) {
       method: 'POST',
       headers: {
         apikey: key,
-        Authorization: `Bearer ${key}`,
+        // New sb_secret_ keys go only in `apikey`; old service_role JWTs (eyJ…) also need Authorization.
+        ...(key.startsWith('eyJ') ? { Authorization: `Bearer ${key}` } : {}),
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
