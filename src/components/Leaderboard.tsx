@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Avatar } from '@/components/Avatar';
 import { Card, tapLight } from '@/components/ui';
 import { BOARDS } from '@/game/boards';
 import type { BoardId } from '@/game/types';
@@ -87,7 +88,7 @@ export function Leaderboard({ leagueId, emptyHint }: { leagueId?: string; emptyH
           {shown.map((r) => (
             <View key={r.user_id} style={[styles.row, r.is_me && styles.rowMe]}>
               <Text style={styles.rank}>{Number(r.rank) <= 3 ? MEDAL[Number(r.rank) - 1] : Number(r.rank)}</Text>
-              <Text style={{ fontSize: 22 }}>{r.avatar}</Text>
+              <Avatar value={r.avatar} size={30} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.name} numberOfLines={1}>
                   {r.nickname}

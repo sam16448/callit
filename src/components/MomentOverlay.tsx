@@ -2,10 +2,14 @@ import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp, FadeOut, ZoomIn } from 'react-native-reanimated';
+import { CrewDancer } from '@/components/brainrot/CrewDancer';
+import { MOMENT_CREW } from '@/components/brainrot/crew';
 import { DEFAULT_CAPTIONS, type MomentId } from '@/game/moments';
 import { C, F, R, S } from '@/theme';
 
 const TINT: Partial<Record<MomentId, string>> = {
+  lockin_hit: '#FFC940',
+  lockin_miss: '#3DDCFF',
   allin_hit: '#FF3D7F',
   allin_miss: '#7C6CFF',
   clutch: '#FFC940',
@@ -14,21 +18,22 @@ const TINT: Partial<Record<MomentId, string>> = {
 };
 
 /**
- * Full-screen reaction for one moment. Tap anywhere to skip; it also leaves on
- * its own. In chill mode it is a small banner instead. Placeholder visuals:
- * the Skia/Lottie effects and CC0 sounds replace the inside later.
+ * Full-screen reaction for one moment. Big moments bring out a Call It crew
+ * member (original characters) dancing or melting down. Tap anywhere to skip;
+ * it also leaves on its own. In chill mode it is a small banner instead.
  */
 export function MomentOverlay({ id, chill, onDone }: { id: MomentId; chill: boolean; onDone: () => void }) {
   const cap = DEFAULT_CAPTIONS[id];
   const tint = TINT[id] ?? C.accent;
   const big = cap.tier === 'big' && !chill;
+  const crew = MOMENT_CREW[id];
 
   useEffect(() => {
     if (!chill) {
-      const type = id === 'allin_miss' ? Haptics.NotificationFeedbackType.Error : Haptics.NotificationFeedbackType.Success;
+      const type = id === 'allin_miss' || id === 'lockin_miss' ? Haptics.NotificationFeedbackType.Error : Haptics.NotificationFeedbackType.Success;
       Haptics.notificationAsync(type).catch(() => {});
     }
-    const t = setTimeout(onDone, big ? 2_200 : 1_500);
+    const t = setTimeout(onDone, big ? 2_600 : 1_500);
     return () => clearTimeout(t);
   }, [id, chill, big, onDone]);
 
@@ -50,10 +55,16 @@ export function MomentOverlay({ id, chill, onDone }: { id: MomentId; chill: bool
     <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(200)} style={styles.full}>
       <Pressable style={styles.fill} onPress={onDone} accessibilityRole="button" accessibilityLabel={`${cap.title}. Tap to skip`}>
         <Animated.View entering={ZoomIn.springify().damping(11)} style={styles.center}>
-          <View style={[styles.ring, { borderColor: tint, shadowColor: tint }]}>
-            <Text style={styles.emoji}>{cap.emoji}</Text>
-          </View>
-          <Text style={[styles.title, { color: tint }]}>{cap.title}</Text>
+          {crew ? (
+            <CrewDancer id={crew.id} mood={crew.mood} tint={tint} />
+          ) : (
+            <View style={[styles.ring, { borderColor: tint, shadowColor: tint }]}>
+              <Text style={styles.emoji}>{cap.emoji}</Text>
+            </View>
+          )}
+          <Text style={[styles.title, { color: tint }, crew && { marginTop: 0 }]} numberOfLines={1} adjustsFontSizeToFit>
+            {cap.title} {crew ? cap.emoji : ''}
+          </Text>
           <Text style={styles.sub}>{cap.sub}</Text>
           <Text style={styles.skip}>tap to skip</Text>
         </Animated.View>

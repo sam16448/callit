@@ -110,6 +110,9 @@ describe('dailyRun', () => {
     expect(hasRun('mixed', SAMPLE_QUESTIONS)).toBe(true);
     expect(hasRun('f1', SAMPLE_QUESTIONS)).toBe(false);
     expect(hasRun('f1', FIX)).toBe(true);
+    // Offline demo: 3-question category runs from the samples.
+    expect(hasRun('f1', SAMPLE_QUESTIONS, 3)).toBe(true);
+    expect(dailyRun('f1', '2026-09-27', SAMPLE_QUESTIONS)).toHaveLength(3);
   });
 
   it('seededShuffle keeps every item', () => {

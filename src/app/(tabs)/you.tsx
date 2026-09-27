@@ -1,6 +1,8 @@
-import { Linking, StyleSheet, Switch, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { Avatar } from '@/components/Avatar';
 import { Button, Card, PageHeader, Pill, Row, Screen, SectionLabel } from '@/components/ui';
+import { AVATARS } from '@/lib/nickname';
 import { useEntitlements } from '@/state/entitlements';
 import { useProfile } from '@/state/profile';
 import { C, F, S, T } from '@/theme';
@@ -15,7 +17,7 @@ export default function You() {
     <Screen tab>
       <PageHeader title="You" />
       <Card style={styles.me}>
-        <Text style={{ fontSize: 44 }}>{profile.avatar}</Text>
+        <Avatar value={profile.avatar} size={56} />
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: S.sm }}>
             <Text style={styles.name}>{profile.nickname}</Text>
@@ -26,6 +28,21 @@ export default function You() {
           </Text>
         </View>
       </Card>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickScroll} contentContainerStyle={styles.pick}>
+        {AVATARS.map((a) => (
+          <Pressable
+            key={a}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: a === profile.avatar }}
+            accessibilityLabel="Change character"
+            onPress={() => update({ avatar: a })}
+            style={[styles.pickItem, a === profile.avatar && styles.pickOn]}
+          >
+            <Avatar value={a} size={38} />
+          </Pressable>
+        ))}
+      </ScrollView>
 
       <SectionLabel>Call It Pro</SectionLabel>
       <Card style={{ paddingVertical: S.sm }}>
@@ -69,12 +86,7 @@ export default function You() {
 
       <SectionLabel>Credits</SectionLabel>
       <Card style={{ paddingVertical: S.sm }}>
-        <Row
-          leading={<Text style={{ fontSize: 20 }}>📖</Text>}
-          title="Open Trivia DB"
-          sub="Category questions from opentdb.com, CC BY-SA 4.0"
-          onPress={() => Linking.openURL('https://opentdb.com')}
-        />
+        <Row leading={<Text style={{ fontSize: 20 }}>🗿</Text>} title="The Call It crew" sub="Original characters, drawn for Call It" />
         <Row leading={<Text style={{ fontSize: 20 }}>💻</Text>} title="Open source" sub="github.com/sam16448/callit · MIT" onPress={() => Linking.openURL('https://github.com/sam16448/callit')} />
       </Card>
 
@@ -86,6 +98,10 @@ export default function You() {
 }
 
 const styles = StyleSheet.create({
+  pickScroll: { marginHorizontal: -S.xl, marginTop: S.md },
+  pick: { gap: S.sm, paddingHorizontal: S.xl },
+  pickItem: { padding: 3, borderRadius: 999, borderWidth: 2, borderColor: 'transparent' },
+  pickOn: { borderColor: C.accent },
   me: { flexDirection: 'row', alignItems: 'center', gap: S.lg },
   name: { color: C.text, fontFamily: F.display, fontSize: 24 },
 });

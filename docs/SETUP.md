@@ -43,17 +43,21 @@ Players don't need an email or password, so turn on anonymous sign-ins:
 
    Save and close. **Never put the secret key in `.env`**: anything starting with `EXPO_PUBLIC_` is built into the app.
 
-## 5. Import the questions
+## 5. Add questions
 
-```powershell
-npm install
-npm run import:questions
+The live question bank is private (so nobody can look answers up), which means a fresh project starts empty. Add at least 5 active questions per board (Mixed needs all 10 boards) in **Table Editor** → `questions`, or with SQL:
+
+```sql
+insert into public.questions (board, prompt, teaser, options, answer_index, difficulty, source_id, source_url, as_of)
+values ('memes', 'Which dictionary made "67" its 2025 Word of the Year?', 'Which dictionary made "67"',
+        array['Dictionary.com', 'Oxford', 'Collins', 'Cambridge'], 0, 'medium', 'mine:memes-01',
+        'https://www.dictionary.com/articles/word-of-the-year-2025', '2026-09-27');
 ```
 
-- It downloads Open Trivia DB (about 10 minutes, one request every 5 seconds) and prints how many questions each board got.
-- Then it asks for the **Secret key**: **Project Settings** → **API Keys** → **Secret keys** → reveal and copy (`sb_secret_…`). Paste it and press Enter. It's used for this upload only and never saved.
-- If anything fails, just run it again: the download is cached and re-uploading doesn't create duplicates.
-- Alternative without a local download: `supabase/functions/import-questions/index.ts` does the same import inside Supabase as an Edge Function, in resumable batches. That's how the live project was filled.
+- `board` is one of: `memes`, `trends`, `brainrot`, `f1`, `football`, `cricket`, `gaming`, `pop-culture`, `anime`, `tech-ai`.
+- `teaser` must be the exact opening words of `prompt` (it's what players see before calling).
+- `answer_index` counts from 0. Every 5th question id goes to the practice pool, so add a few extra.
+- Check with `select * from board_status();` — every board should say `playable = true`.
 
 ## 6. RevenueCat webhook (server-side Pro)
 

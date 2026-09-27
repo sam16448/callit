@@ -1,16 +1,12 @@
 Question data licence
 =====================
 
-Questions imported from the Open Trivia Database (https://opentdb.com) are
-licensed under the Creative Commons Attribution-ShareAlike 4.0 International
+The sample questions in src/data/sampleQuestions.ts are written for Call It and
+released under the Creative Commons Attribution-ShareAlike 4.0 International
 licence (CC BY-SA 4.0): https://creativecommons.org/licenses/by-sa/4.0/
 
-Changes made on import (src/data/opentdb.ts): text decoded and whitespace
-normalised, answer options shuffled, a short "teaser" (the opening words)
-added, and records that were too long or malformed left out.
-
-Questions written for Call It (the samples in src/data/sampleQuestions.ts and
-any data/questions/*.callit.json files) are also released under CC BY-SA 4.0,
-so the whole question set can be shared under one licence.
+The live ranked question bank is kept out of this public repository on purpose,
+so answers can't be looked up during a run. It lives only in the game's
+database.
 
 The app's source code is under the MIT licence (see LICENSE in the repository root).

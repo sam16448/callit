@@ -43,10 +43,13 @@ export function poolFor(board: BoardId, all: readonly Question[]): Question[] {
   return board === 'mixed' ? all.slice() : all.filter((q) => q.category === board);
 }
 
-/** True when a board has enough questions to make a full run. */
-export function hasRun(board: BoardId, all: readonly Question[]): boolean {
+/**
+ * True when a board has enough questions for a run: a full one by default, or
+ * at least `min` (the offline demo plays 3-question category runs).
+ */
+export function hasRun(board: BoardId, all: readonly Question[], min?: number): boolean {
   const b = boardById(board);
-  return Boolean(b) && poolFor(board, all).length >= (b?.runLength ?? Infinity);
+  return Boolean(b) && poolFor(board, all).length >= Math.min(min ?? Infinity, b?.runLength ?? Infinity);
 }
 
 /**

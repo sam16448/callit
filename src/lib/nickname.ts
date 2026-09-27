@@ -1,10 +1,15 @@
+import { CHARACTER_IDS, characterAvatar } from './avatar';
+
 /** Nickname rules: what shows on every board. No password, so keep it tidy. */
 
 export const NICKNAME_MIN = 3;
 export const NICKNAME_MAX = 16;
 
-/** Starter avatars. Plain Unicode emoji, so nothing to license. */
-export const AVATARS = ['🦊', '🐯', '🦉', '🐙', '🦖', '🐼', '🦄', '🐸', '🐺', '🦁', '🐧', '🦈', '🐝', '🦜', '🐲', '👾'] as const;
+/** Emoji avatars. Plain Unicode, so nothing to license. */
+export const EMOJI_AVATARS = ['🗿', '💀', '🦊', '🐸', '🦈', '🐺', '👾', '🐲'] as const;
+
+/** Avatar picker: the Call It crew (original characters) first, then emoji. */
+export const AVATARS: string[] = [...CHARACTER_IDS.map(characterAvatar), ...EMOJI_AVATARS];
 
 export function cleanNickname(raw: string): string {
   return raw.replace(/\s+/g, ' ').trim();

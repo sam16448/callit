@@ -2,8 +2,11 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Avatar } from '@/components/Avatar';
+import { CHARACTER_BY_ID } from '@/components/brainrot/characters';
 import { CallTag } from '@/components/CallTag';
 import { Button, Card, Screen, SectionLabel } from '@/components/ui';
+import { characterIdOf } from '@/lib/avatar';
 import { AVATARS, NICKNAME_MAX, cleanNickname, nicknameError } from '@/lib/nickname';
 import { takePendingInvite } from '@/lib/pendingInvite';
 import { useProfile } from '@/state/profile';
@@ -30,9 +33,10 @@ export default function Onboarding() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen footer={<Button title="Let's play" icon="flash" onPress={start} disabled={touched && Boolean(error)} />}>
         <Text style={styles.brand}>CALL IT</Text>
-        <Text style={styles.hero}>Know it?{'\n'}Call it.</Text>
+        <Text style={styles.hero}>Got ball?{'\n'}Prove it.</Text>
         <Text style={styles.lede}>
-          A daily trivia league. Before each answer you see the opening words and make your call. Skill decides rank. Money never does.
+          Daily runs on what the internet is talking about: memes, trends, brainrot, F1, cricket and more. See the opening words, make your call, farm
+          Aura. Skill decides rank. Money never does.
         </Text>
 
         <Card style={styles.howCard}>
@@ -69,27 +73,33 @@ export default function Onboarding() {
           {touched && error ? error : 'Shown on the boards. No password, no email.'}
         </Text>
 
-        <SectionLabel>Pick your avatar</SectionLabel>
+        <SectionLabel>Pick your character</SectionLabel>
         <View style={styles.avatars}>
           {AVATARS.map((a) => (
             <Pressable
               key={a}
               accessibilityRole="radio"
               accessibilityState={{ selected: a === avatar }}
-              accessibilityLabel={`Avatar ${a}`}
+              accessibilityLabel={`Avatar ${crewName(a) ?? a}`}
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
                 setAvatar(a);
               }}
               style={[styles.avatar, a === avatar && styles.avatarOn]}
             >
-              <Text style={styles.avatarText}>{a}</Text>
+              <Avatar value={a} size={44} />
             </Pressable>
           ))}
         </View>
+        <Text style={styles.hint}>{crewName(avatar) ?? 'Classic emoji'}</Text>
       </Screen>
     </KeyboardAvoidingView>
   );
+}
+
+function crewName(avatar: string): string | null {
+  const id = characterIdOf(avatar);
+  return id ? CHARACTER_BY_ID[id].name : null;
 }
 
 const styles = StyleSheet.create({
@@ -123,5 +133,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarOn: { borderColor: C.accent, backgroundColor: C.accentSoft },
-  avatarText: { fontSize: 26 },
 });

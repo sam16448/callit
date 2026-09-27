@@ -34,7 +34,7 @@ export function inviteLink(code: string): string {
 
 /** The message sent to friends: works even if the link can't be tapped (the code is typed in). */
 export function inviteText(name: string, code: string): string {
-  return [`Join my Call It league "${name}" 🏆`, `Code: ${code}`, `Open in the app: ${inviteLink(code)}`, 'Same daily questions for everyone. Skill decides rank; money never does.'].join('\n');
+  return [`Join my Call It league "${name}" 🏆`, `Code: ${code}`, `Open in the app: ${inviteLink(code)}`, 'Got ball? Prove it. Same daily questions for everyone; money never buys rank.'].join('\n');
 }
 
 /** Pulls a league code out of anything pasted: a code, an invite link or the whole invite message. */

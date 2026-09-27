@@ -1,5 +1,7 @@
 import type { Ref } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Avatar, CharacterArt } from '@/components/Avatar';
+import { MOMENT_CREW } from '@/components/brainrot/crew';
 import { DEFAULT_CAPTIONS } from '@/game/moments';
 import { formatPoints } from '@/lib/format';
 import { shortDay } from '@/lib/share';
@@ -15,6 +17,7 @@ export function ShareCard({ record, boardName, nickname, avatar, ref }: { record
   const correct = record.answers.filter((a) => a.correct).length;
   const allins = record.answers.filter((a) => a.call === 'allin');
   const big = record.biggest ? DEFAULT_CAPTIONS[record.biggest] : null;
+  const crew = record.biggest ? MOMENT_CREW[record.biggest] : undefined;
 
   return (
     <View ref={ref} collapsable={false} style={styles.card}>
@@ -40,7 +43,7 @@ export function ShareCard({ record, boardName, nickname, avatar, ref }: { record
 
       {big ? (
         <View style={styles.moment}>
-          <Text style={styles.momentEmoji}>{big.emoji}</Text>
+          {crew ? <CharacterArt id={crew.id} size={46} /> : <Text style={styles.momentEmoji}>{big.emoji}</Text>}
           <View style={{ flex: 1 }}>
             <Text style={styles.momentTitle}>{big.title}</Text>
             <Text style={styles.momentSub}>{big.sub}</Text>
@@ -54,14 +57,18 @@ export function ShareCard({ record, boardName, nickname, avatar, ref }: { record
       )}
 
       <View style={styles.bottom}>
-        <Text style={styles.player}>{nickname ? `${avatar ?? ''} ${nickname}`.trim() : ''}</Text>
-        <Text style={styles.tag}>Skill decides rank.</Text>
+        <View style={styles.playerRow}>
+          {nickname ? <Avatar value={avatar} size={26} /> : null}
+          <Text style={styles.player}>{nickname ?? ''}</Text>
+        </View>
+        <Text style={styles.tag}>Got ball? Prove it.</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   card: {
     aspectRatio: 4 / 5,
     width: '100%',

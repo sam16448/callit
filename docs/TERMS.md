@@ -23,7 +23,7 @@ One account per person. Nicknames that are abusive or impersonate someone may be
 
 ## Questions
 
-Category questions come from the [Open Trivia Database](https://opentdb.com) under CC BY-SA 4.0. Spotted a wrong answer? Report it in the app.
+Questions are written and fact-checked for Call It, about what's trending at the time (each one records the date it was true). Spotted a wrong or outdated answer? Report it in the app.
 
 ## Contact
 

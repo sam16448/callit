@@ -20,7 +20,7 @@ import type { Call } from '@/game/types';
 import { formatPoints } from '@/lib/format';
 import { recordFromRecap, recordFromRun } from '@/lib/share';
 import { ApiError } from '@/services/api';
-import { createDriver, isBoardPlayable } from '@/services/questions';
+import { createDriver, isBoardPlayable, plannedRunLength } from '@/services/questions';
 import { shareRun } from '@/services/shareCard';
 import { useProfile } from '@/state/profile';
 import { useRuns, type RunRecord } from '@/state/runs';
@@ -338,7 +338,7 @@ function LiveRun({
         <Text style={styles.introEmoji}>{board.emoji}</Text>
         <Text style={styles.introTitle}>{board.id === 'mixed' ? "Today's Mixed run" : `Today's ${board.name} run`}</Text>
         <Text style={styles.introSub}>
-          {board.runLength} questions · 15 seconds each · one attempt{board.id === 'mixed' ? ' · global board' : ' · weekly board'}
+          {plannedRunLength(board.id, board.runLength, day)} questions · 15 seconds each · one attempt{board.id === 'mixed' ? ' · global board' : ' · weekly board'}
         </Text>
         {resuming > 0 ? (
           <Card style={{ marginTop: S.xl }}>

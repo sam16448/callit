@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Avatar } from '@/components/Avatar';
 import { Button, Card, Pill, Screen, SectionLabel, tapLight } from '@/components/ui';
 import { BOARDS, boardById, type Board } from '@/game/boards';
 import { formatCountdown, msUntilNextRun, utcDay } from '@/game/time';
@@ -106,7 +107,7 @@ export default function Play() {
     <Screen tab>
       <View style={styles.top}>
         <View style={styles.me}>
-          <Text style={styles.avatar}>{profile?.avatar}</Text>
+          <Avatar value={profile?.avatar} size={42} />
           <View>
             <Text style={styles.hi}>Hey {profile?.nickname}</Text>
             <Text style={styles.sub}>New runs in {formatCountdown(msUntilNextRun(now))}</Text>
@@ -154,7 +155,7 @@ export default function Play() {
         {pro ? <Pill text="PRO" color={C.accentInk} filled={C.accent} /> : <Ionicons name="chevron-forward" size={18} color={C.faint} />}
       </Pressable>
 
-      <SectionLabel right={<Text style={styles.small}>5 questions · weekly boards</Text>}>Category runs</SectionLabel>
+      <SectionLabel right={<Text style={styles.small}>{ONLINE ? 5 : 3} questions · weekly boards</Text>}>Category runs</SectionLabel>
       <View style={styles.tiles}>
         {categories.map((b) => {
           const open = playable(b.id);
@@ -189,7 +190,6 @@ export default function Play() {
 const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: S.sm, marginBottom: S.lg },
   me: { flexDirection: 'row', alignItems: 'center', gap: S.md, flex: 1 },
-  avatar: { fontSize: 34 },
   hi: { color: C.text, fontFamily: F.bold, fontSize: 18 },
   sub: { color: C.muted, fontFamily: F.body, fontSize: 13, marginTop: 1 },
   hero: { borderColor: 'rgba(200,255,46,0.35)', borderWidth: 1 },
