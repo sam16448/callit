@@ -25,7 +25,8 @@ const cat = (id: CategoryId, name: string, emoji: string, tagline: string): Boar
 export const BOARDS: readonly Board[] = [
   { id: 'mixed', name: 'Mixed', emoji: '🌍', tagline: 'A bit of everything. The global board.', runLength: MIXED_RUN_LENGTH },
   cat('memes', 'Ball Knowledge', '🧠', 'Memes and internet moments since 2022'),
-  cat('trends', 'Trends', '📈', 'What blew up on Insta and TikTok'),
+  cat('now', 'Trending Now', '🔥', 'What the internet is on this month'),
+  cat('trends', 'Trends Vault', '📈', 'Every Insta and TikTok trend since 2022'),
   cat('brainrot', 'Brainrot', '🗿', 'Lore only the chronically online know'),
   cat('f1', 'F1', '🏎️', 'Drivers, drama, radio messages'),
   cat('football', 'Football', '⚽', 'Real ball knowledge'),

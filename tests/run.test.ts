@@ -50,9 +50,9 @@ function newDriver(questions: Question[], clock: ReturnType<typeof fakeClock>): 
 }
 
 describe('sample questions', () => {
-  it('has 30 valid questions with unique ids', () => {
-    expect(SAMPLE_QUESTIONS).toHaveLength(30);
-    expect(new Set(SAMPLE_QUESTIONS.map((q) => q.id)).size).toBe(30);
+  it('has 33 valid questions with unique ids', () => {
+    expect(SAMPLE_QUESTIONS).toHaveLength(33);
+    expect(new Set(SAMPLE_QUESTIONS.map((q) => q.id)).size).toBe(33);
     for (const q of SAMPLE_QUESTIONS) {
       expect([2, 4]).toContain(q.options.length);
       expect(q.answerIndex).toBeGreaterThanOrEqual(0);

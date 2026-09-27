@@ -1,5 +1,5 @@
 /**
- * 30 sample questions for the offline demo (no Supabase keys), 3 per board.
+ * 33 sample questions for the offline demo (no Supabase keys), 3 per board.
  * The live question bank is NOT in this public repo, so its answers can't be
  * looked up; these samples are separate and never used in ranked online runs.
  *
@@ -13,7 +13,12 @@ export const SAMPLE_QUESTIONS: Question[] = [
   { id: 'mem-02', category: 'memes', difficulty: 'easy', prompt: 'The 2023 "Grimace Shake" trend came from which fast-food chain?', teaser: 'The 2023 "Grimace Shake" trend', options: ['Burger King', 'Wendy’s', 'McDonald’s', 'Taco Bell'], answerIndex: 2 },
   { id: 'mem-03', category: 'memes', difficulty: 'hard', prompt: 'The viral "Hawk Tuah" street interview (2024) was filmed in which US city?', teaser: 'The viral "Hawk Tuah" street interview', options: ['Austin', 'Nashville', 'Miami', 'New Orleans'], answerIndex: 1 },
 
-  // Trends
+  // Trending Now (facts not used in the live bank)
+  { id: 'now-01', category: 'now', difficulty: 'medium', prompt: 'Samsung\u2019s July 2026 Galaxy Unpacked (Z Fold8 Ultra) was held in which city?', teaser: 'Samsung\u2019s July 2026 Galaxy Unpacked', options: ['New York', 'London', 'Seoul', 'Paris'], answerIndex: 1 },
+  { id: 'now-02', category: 'now', difficulty: 'hard', prompt: 'Google\u2019s $29 AirTag rival, launched in August 2026, is called…', teaser: 'Google\u2019s $29 AirTag rival', options: ['Pixel Find', 'Pixel Tag', 'Pixel Seek', 'Pixel Dot'], answerIndex: 1 },
+  { id: 'now-03', category: 'now', difficulty: 'medium', prompt: 'The new 2D Metroid revealed at the September 2026 Nintendo Direct is called…', teaser: 'The new 2D Metroid revealed', options: ['Metroid Dread 2', 'Metroid Prime 5', 'Metroid Ravenous', 'Metroid Fusion Remake'], answerIndex: 2 },
+
+  // Trends Vault
   { id: 'trd-01', category: 'trends', difficulty: 'easy', prompt: '"Very demure, very mindful" went viral in 2024 thanks to which creator?', teaser: '"Very demure, very mindful" went viral', options: ['Alix Earle', 'Jools Lebron', 'Brittany Broski', 'Keith Lee'], answerIndex: 1 },
   { id: 'trd-02', category: 'trends', difficulty: 'easy', prompt: '"Brat summer" (2024) came from an album by which artist?', teaser: '"Brat summer" (2024) came from', options: ['Chappell Roan', 'Sabrina Carpenter', 'Charli XCX', 'Billie Eilish'], answerIndex: 2 },
   { id: 'trd-03', category: 'trends', difficulty: 'medium', prompt: 'What is the name of the viral pygmy hippo from Thailand’s Khao Kheow Open Zoo?', teaser: 'What is the name of the viral pygmy hippo', options: ['Moo Deng', 'Moo Ping', 'Pesto', 'Moo Tun'], answerIndex: 0 },

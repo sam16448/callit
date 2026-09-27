@@ -9,8 +9,8 @@ Built with Expo SDK 57 for the RevenueCat Shipaton 2026 Next Gen Award.
 ## How it plays
 
 - **New runs every day at 00:00 UTC (5:30 AM IST)**, free, one attempt, identical for every player.
-- **Mixed run** (10 questions, one from each board) feeds the **global board**. Only Mixed counts there, so grinding more boards can't buy global rank.
-- **10 boards** (5 questions a day each) with their own weekly leaderboards: 🧠 Ball Knowledge (memes 2022+), 📈 Trends (Instagram/TikTok), 🗿 Brainrot, 🏎️ F1, ⚽ Football, 🏏 Cricket, 🎮 Gaming, 🎬 Pop Culture, 🍥 Anime, 🤖 Tech & AI.
+- **Mixed run** (10 questions from 10 different boards) feeds the **global board**. Only Mixed counts there, so grinding more boards can't buy global rank.
+- **11 boards** (5 questions a day each) with their own weekly leaderboards: 🔥 Trending Now (this month's internet), 🧠 Ball Knowledge (memes 2022+), 📈 Trends Vault (every Insta/TikTok trend since 2022), 🗿 Brainrot, 🏎️ F1, ⚽ Football, 🏏 Cricket, 🎮 Gaming, 🎬 Pop Culture, 🍥 Anime, 🤖 Tech & AI.
 - **Generational Lock-In 🔒**: once per run, after reading the opening words, stake your **whole week's Aura on that board**. Right: your week doubles. Wrong or out of time: it goes to 0. Two taps to confirm, enforced by the server.
 - **Tricky and current**: questions are written and fact-checked for Call It about what's trending, each with a source and the date it was true. Distractors are the near-misses (Oxford's word vs Merriam-Webster's, the 2024 answer vs the 2025 one).
 - **The Call It crew**: original brainrot-style characters (Frigorifero Flamingetto, Samosa Supremo, Chai Chai Occhialini, Mangolino Reale…) to play as, and they dance or melt down on the big moments: GENERATIONAL, FUMBLED THE BAG, AURA +1000, cooked, clutch, perfect run.
@@ -31,7 +31,7 @@ Built with Expo SDK 57 for the RevenueCat Shipaton 2026 Next Gen Award.
 | --- | --- |
 | Onboarding (nickname + crew character, no password), Play tab, full run: call → question → result → summary | ✅ |
 | Aura, Generational Lock-In, moments with crew animations, daily runs, resume a paused run | ✅ tested |
-| Supabase: server scoring, security, weekly boards, ~250 fact-checked trending questions on 10 boards | ✅ live, tested on real Postgres |
+| Supabase: server scoring, security, weekly boards, ~280 fact-checked trending questions on 11 boards | ✅ live, tested on real Postgres |
 | Call It Pro with RevenueCat: paywall per reason, restore, preview mode in Expo Go | ✅ |
 | Practice (separate question pool, 20 free a day, unlimited with Pro) | ✅ |
 | Leagues: join with a code (free), create (Pro), league boards, `callit://join/CODE` invites | ✅ |
@@ -58,7 +58,7 @@ npm install
 npx expo start
 ```
 
-With no keys it runs as an **offline demo**: 30 bundled sample questions (3 per board), scored on the phone with the same rules. To switch on the online version (server scoring, live leaderboards, your own question bank), follow **[docs/SETUP.md](docs/SETUP.md)**.
+With no keys it runs as an **offline demo**: 33 bundled sample questions (3 per board), scored on the phone with the same rules. To switch on the online version (server scoring, live leaderboards, your own question bank), follow **[docs/SETUP.md](docs/SETUP.md)**.
 
 Checks: `npm run lint`, `npm run typecheck`, `npm test`.
 

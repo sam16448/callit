@@ -18,7 +18,8 @@ export type BoardId =
   | 'gaming'
   | 'pop-culture'
   | 'anime'
-  | 'tech-ai';
+  | 'tech-ai'
+  | 'now';
 
 /** A category board: every board except "mixed". */
 export type CategoryId = Exclude<BoardId, 'mixed'>;

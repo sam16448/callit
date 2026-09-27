@@ -213,8 +213,9 @@ describe('daily sets', () => {
   it('reports which boards are playable', async () => {
     const rows = await asUser<{ board: string; questions: number; playable: boolean }>(A, 'select * from public.board_status()');
     const by = Object.fromEntries(rows.map((r) => [r.board, r]));
-    expect(rows).toHaveLength(11);
+    expect(rows).toHaveLength(12);
     expect(by.football.playable).toBe(true);
+    expect(by.now.playable).toBe(true);
     expect(by.mixed.playable).toBe(true);
     await db.exec(`update public.questions set active = false where board = 'cricket'`);
     const after = await asUser<{ board: string; playable: boolean }>(A, 'select * from public.board_status()');

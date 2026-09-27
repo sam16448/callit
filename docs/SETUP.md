@@ -45,7 +45,7 @@ Players don't need an email or password, so turn on anonymous sign-ins:
 
 ## 5. Add questions
 
-The live question bank is private (so nobody can look answers up), which means a fresh project starts empty. Add at least 5 active questions per board (Mixed needs all 10 boards) in **Table Editor** → `questions`, or with SQL:
+The live question bank is private (so nobody can look answers up), which means a fresh project starts empty. Add at least 5 active questions per board (Mixed needs at least 10 boards) in **Table Editor** → `questions`, or with SQL:
 
 ```sql
 insert into public.questions (board, prompt, teaser, options, answer_index, difficulty, source_id, source_url, as_of)
@@ -54,7 +54,7 @@ values ('memes', 'Which dictionary made "67" its 2025 Word of the Year?', 'Which
         'https://www.dictionary.com/articles/word-of-the-year-2025', '2026-09-27');
 ```
 
-- `board` is one of: `memes`, `trends`, `brainrot`, `f1`, `football`, `cricket`, `gaming`, `pop-culture`, `anime`, `tech-ai`.
+- `board` is one of: `now`, `memes`, `trends`, `brainrot`, `f1`, `football`, `cricket`, `gaming`, `pop-culture`, `anime`, `tech-ai`.
 - `teaser` must be the exact opening words of `prompt` (it's what players see before calling).
 - `answer_index` counts from 0. Every 5th question id goes to the practice pool, so add a few extra.
 - Check with `select * from board_status();` — every board should say `playable = true`.

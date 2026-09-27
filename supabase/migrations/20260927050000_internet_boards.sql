@@ -38,4 +38,4 @@ alter table public.questions add column if not exists as_of date;
 
 update public.questions set active = false
 where source = 'opentdb'
-   or board not in ('memes', 'trends', 'brainrot', 'f1', 'football', 'cricket', 'gaming', 'pop-culture', 'anime', 'tech-ai');
+   or board not in ('now', 'memes', 'trends', 'brainrot', 'f1', 'football', 'cricket', 'gaming', 'pop-culture', 'anime', 'tech-ai');
