@@ -69,10 +69,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   );
 
   const reset = useCallback(() => {
-    commit(null);
-    removeKey(KEYS.runs);
-    // Online: start as a brand-new anonymous player.
-    supabase?.auth.signOut().catch(() => {});
+    // Online: start as a brand-new anonymous player. Sign out first (local
+    // only), so the next nickname goes to the new player, not the old one.
+    const out = supabase ? supabase.auth.signOut({ scope: 'local' }).catch(() => {}) : Promise.resolve();
+    out.finally(() => {
+      commit(null);
+      removeKey(KEYS.runs);
+    });
   }, [commit]);
 
   const value = useMemo(() => ({ loaded, profile, create, update, recordPlay, reset }), [loaded, profile, create, update, recordPlay, reset]);

@@ -35,20 +35,26 @@ if (supabase && Platform.OS !== 'web') {
 
 let signingIn: Promise<string> | null = null;
 
-/** Signs in anonymously once and returns the user id. */
-export function ensureSession(): Promise<string> {
-  if (!supabase) return Promise.reject(new Error('Offline mode'));
+/**
+ * Returns the signed-in player's id, signing in anonymously when there is no
+ * session (first launch, or after "Start over" signed the old player out).
+ * Only an in-flight sign-in is shared, never a finished one, so a sign-out is
+ * always noticed.
+ */
+export async function ensureSession(): Promise<string> {
+  if (!supabase) throw new Error('Offline mode');
+  const { data } = await supabase.auth.getSession();
+  if (data.session?.user) return data.session.user.id;
   if (!signingIn) {
-    signingIn = (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.user) return data.session.user.id;
-      const res = await supabase.auth.signInAnonymously();
-      if (res.error || !res.data.user) throw new Error(res.error?.message ?? 'Could not sign in');
-      return res.data.user.id;
-    })().catch((e) => {
-      signingIn = null;
-      throw e;
-    });
+    signingIn = supabase.auth
+      .signInAnonymously()
+      .then((res) => {
+        if (res.error || !res.data.user) throw new Error(res.error?.message ?? 'Could not sign in');
+        return res.data.user.id;
+      })
+      .finally(() => {
+        signingIn = null;
+      });
   }
   return signingIn;
 }

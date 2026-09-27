@@ -54,6 +54,11 @@ export function syncProfile(nickname: string, avatar: string): Promise<unknown> 
   return sentProfile;
 }
 
+// A new player (after "Start over") needs their profile sent again.
+supabase?.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') sentProfile = null;
+});
+
 async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
   if (wantedProfile && !sentProfile) syncProfile(wantedProfile.nickname, wantedProfile.avatar).catch(() => {});
   if (sentProfile) await sentProfile.catch(() => {});
