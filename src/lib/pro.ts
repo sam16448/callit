@@ -48,7 +48,7 @@ export const PRO_PERKS: {
   { icon: 'stats-chart-outline', text: 'Your stats: accuracy, calls, best runs', soon: true },
   { icon: 'shield-checkmark-outline', text: 'Streak shield: one missed day a week', soon: true },
   { icon: 'sparkles-outline', text: 'Cosmetic effect packs', soon: true },
-  { icon: 'ribbon-outline', text: 'Pro badge on the boards', soon: true },
+  { icon: 'ribbon-outline', text: 'Pro badge on the boards' },
 ];
 
 export function isPaywallReason(v: unknown): v is PaywallReason {

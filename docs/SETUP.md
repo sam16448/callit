@@ -55,7 +55,25 @@ npm run import:questions
 - If anything fails, just run it again: the download is cached and re-uploading doesn't create duplicates.
 - Alternative without a local download: `supabase/functions/import-questions/index.ts` does the same import inside Supabase as an Edge Function, in resumable batches. That's how the live project was filled.
 
-## 6. Play
+## 6. RevenueCat webhook (server-side Pro)
+
+This lets the server know who has Call It Pro (for the Pro badge on the boards, and so Pro checks can't be faked from the app).
+
+1. Deploy `supabase/functions/revenuecat-webhook/index.ts` as an Edge Function named `revenuecat-webhook` with **JWT verification off** (RevenueCat can't log in; a shared secret protects it instead).
+2. Pick a long random secret. Store only its SHA-256 in the database (SQL Editor):
+   ```sql
+   insert into public.webhook_secrets (name, sha256)
+   values ('revenuecat', encode(sha256(convert_to('YOUR-SECRET', 'UTF8')), 'hex'))
+   on conflict (name) do update set sha256 = excluded.sha256;
+   ```
+3. RevenueCat dashboard → your project → **Integrations** → **Webhooks** → **Add**:
+   - URL: `https://<your-project>.supabase.co/functions/v1/revenuecat-webhook`
+   - Authorization header value: `YOUR-SECRET`
+   - Send a **test event**: it should show as delivered (HTTP 200).
+4. Optional, once purchases reach the server reliably: make the server enforce Pro too:
+   `update public.app_settings set value = 'true' where key = 'enforce_pro_server';`
+
+## 7. Play
 
 ```powershell
 npx expo start

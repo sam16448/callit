@@ -332,3 +332,70 @@ describe('practice', () => {
     await expectError(rpc(A, 'is_practice_question', [5]), /permission denied/);
   });
 });
+
+describe('RevenueCat webhook', () => {
+  const event = (type: string, extra: Record<string, unknown> = {}) => ({
+    id: `evt-${type}-${Math.random()}`,
+    type,
+    app_user_id: C,
+    original_app_user_id: '$RCAnonymousID:abc',
+    aliases: ['$RCAnonymousID:abc', C],
+    entitlement_ids: ['pro'],
+    expiration_at_ms: Date.now() + 30 * 86_400_000,
+    environment: 'SANDBOX',
+    ...extra,
+  });
+  const apply = async (e: object) => (await db.query<{ n: number }>('select public.apply_revenuecat_event($1::jsonb) as n', [JSON.stringify(e)])).rows[0].n;
+  const pro = async (uid: string) => (await db.query<{ p: boolean }>('select public.has_pro($1) as p', [uid])).rows[0].p;
+
+  it('checks the shared secret by hash only', async () => {
+    await db.exec(`insert into public.webhook_secrets (name, sha256) values ('revenuecat', encode(sha256(convert_to('s3cret-value', 'UTF8')), 'hex')) on conflict (name) do update set sha256 = excluded.sha256`);
+    const ok = (await db.query<{ ok: boolean }>(`select public.check_webhook_secret('revenuecat', 's3cret-value') as ok`)).rows[0].ok;
+    const bad = (await db.query<{ ok: boolean }>(`select public.check_webhook_secret('revenuecat', 'guess') as ok`)).rows[0].ok;
+    expect([ok, bad]).toEqual([true, false]);
+  });
+
+  it('turns Pro on for a purchase and ignores retries of the same event', async () => {
+    await db.exec(`update public.profiles set is_pro = false, pro_until = null where id = '${C}'`);
+    const e = event('INITIAL_PURCHASE');
+    expect(await apply(e)).toBe(1);
+    expect(await pro(C)).toBe(true);
+    expect(await apply(e)).toBe(0); // same id again
+  });
+
+  it('keeps Pro through a cancellation until it expires', async () => {
+    await apply(event('CANCELLATION'));
+    expect(await pro(C)).toBe(true);
+    await apply(event('EXPIRATION', { expiration_at_ms: Date.now() - 1000 }));
+    expect(await pro(C)).toBe(false);
+  });
+
+  it('treats Pro as over once pro_until passes, even without an EXPIRATION event', async () => {
+    await apply(event('RENEWAL', { expiration_at_ms: Date.now() - 60_000 }));
+    expect(await pro(C)).toBe(false);
+  });
+
+  it('ignores events for other entitlements and unknown users', async () => {
+    expect(await apply(event('INITIAL_PURCHASE', { entitlement_ids: ['something_else'] }))).toBe(0);
+    expect(await apply(event('INITIAL_PURCHASE', { app_user_id: 'not-a-uuid', aliases: [] , original_app_user_id: null}))).toBe(0);
+  });
+
+  it('moves Pro on a transfer', async () => {
+    await apply(event('INITIAL_PURCHASE'));
+    expect(await pro(C)).toBe(true);
+    await apply(event('TRANSFER', { transferred_from: [C], transferred_to: [B], app_user_id: B, aliases: [B] }));
+    expect(await pro(C)).toBe(false);
+    expect(await pro(B)).toBe(true);
+    await db.exec(`update public.profiles set is_pro = false, pro_until = null where id in ('${B}', '${C}')`);
+  });
+
+  it('shows Pro on the board and lets players check their own status, but not change it', async () => {
+    await apply(event('INITIAL_PURCHASE', { app_user_id: B, aliases: [B] }));
+    const rows = await asUser<{ nickname: string; is_pro: boolean }>(A, `select * from public.weekly_board('geography')`);
+    expect(rows.find((r) => r.nickname === 'आरव')?.is_pro).toBe(true);
+    expect(await rpc(B, 'my_pro')).toBe(true);
+    await expectError(rpc(B, 'apply_revenuecat_event', [JSON.stringify(event('INITIAL_PURCHASE'))]), /permission denied/);
+    await expectError(asUser(A, 'select * from public.webhook_secrets'), /permission denied/);
+    await db.exec(`update public.profiles set is_pro = false, pro_until = null where id = '${B}'`);
+  });
+});
