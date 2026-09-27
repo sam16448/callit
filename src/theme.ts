@@ -54,3 +54,17 @@ export const T = {
   small: { fontFamily: F.body, fontSize: 13, lineHeight: 19 },
   label: { fontFamily: F.bold, fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase' as const },
 };
+
+/** Mixes a hex colour towards black (amount < 0) or white (amount > 0). */
+export function shade(hex: string, amount: number): string {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) =>
+    Math.round(amount < 0 ? c * (1 + amount) : c + (255 - c) * amount),
+  );
+  return `#${ch.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Hex colour with an alpha (0–1), for tints. */
+export function alpha(hex: string, a: number): string {
+  return `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
+}

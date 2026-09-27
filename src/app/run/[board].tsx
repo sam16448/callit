@@ -2,9 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { CallPicker, LOCKIN_GOLD } from '@/components/CallPicker';
 import { CallTag } from '@/components/CallTag';
+import { Confetti } from '@/components/Confetti';
+import { CountUp } from '@/components/CountUp';
 import { MomentOverlay } from '@/components/MomentOverlay';
 import { OptionButton, type OptionState } from '@/components/OptionButton';
 import { RunSummary } from '@/components/RunSummary';
@@ -24,7 +26,7 @@ import { createDriver, isBoardPlayable, plannedRunLength } from '@/services/ques
 import { shareRun } from '@/services/shareCard';
 import { useProfile } from '@/state/profile';
 import { useRuns, type RunRecord } from '@/state/runs';
-import { CALL_COLOR, C, F, R, S, T } from '@/theme';
+import { CALL_COLOR, C, F, R, S, T, alpha } from '@/theme';
 
 /** Wall clock, kept outside components so render stays pure. */
 function nowMs() {
@@ -327,6 +329,11 @@ function LiveRun({
     />
   );
 
+  /** Right answers in a row so far this run, for the streak chip. */
+  let streak = 0;
+  for (const a of run?.answers ?? []) streak = a.correct ? streak + 1 : 0;
+  const lastAnswer = run?.answers[run.answers.length - 1];
+
   let body: React.ReactNode = null;
   let footer: React.ReactNode = null;
 
@@ -335,7 +342,9 @@ function LiveRun({
   } else if (stage === 'intro') {
     body = (
       <Animated.View entering={FadeIn.duration(250)}>
-        <Text style={styles.introEmoji}>{board.emoji}</Text>
+        <View style={[styles.introBadge, { backgroundColor: alpha(board.color, 0.18), borderColor: alpha(board.color, 0.5) }]}>
+          <Text style={styles.introEmoji}>{board.emoji}</Text>
+        </View>
         <Text style={styles.introTitle}>{board.id === 'mixed' ? "Today's Mixed run" : `Today's ${board.name} run`}</Text>
         <Text style={styles.introSub}>
           {plannedRunLength(board.id, board.runLength, day)} questions · 15 seconds each · one attempt{board.id === 'mixed' ? ' · global board' : ' · weekly board'}
@@ -370,9 +379,16 @@ function LiveRun({
   } else if (run && run.phase === 'call') {
     body = run.teaser ? (
       <Animated.View key={`call-${run.index}`} entering={FadeInDown.duration(260)}>
-        <Dots total={run.questionCount} index={run.index} answers={run.answers.map((a) => a.correct)} offset={run.index - run.answers.length} />
+        <View style={styles.callTop}>
+          <Dots total={run.questionCount} index={run.index} answers={run.answers.map((a) => a.correct)} offset={run.index - run.answers.length} />
+          {streak >= 2 ? (
+            <Animated.View entering={FadeIn} style={styles.streak}>
+              <Text style={styles.streakText}>🔥 {streak} in a row</Text>
+            </Animated.View>
+          ) : null}
+        </View>
         <Text style={[T.label, { color: C.muted, marginTop: S.xl }]}>{categoryLabel(run.teaser.category)}</Text>
-        <Card style={styles.teaserCard}>
+        <Card style={[styles.teaserCard, { borderColor: alpha(board.color, 0.45) }]}>
           <Text style={styles.teaser}>“{run.teaser.teaser}”</Text>
         </Card>
         <Text style={styles.callPrompt}>Make your call</Text>
@@ -402,9 +418,7 @@ function LiveRun({
             <Text style={[styles.resultWord, { color: last.correct ? C.good : C.bad }]}>
               {last.correct ? 'Right' : last.choice === null ? "Time's up" : 'Wrong'}
             </Text>
-            <Text style={[styles.resultPts, { color: last.points > 0 ? C.good : last.points < 0 ? C.bad : C.muted }]}>
-              {formatPoints(last.points, { sign: true })}
-            </Text>
+            <CountUp value={last.points} sign style={[styles.resultPts, { color: last.points > 0 ? C.good : last.points < 0 ? C.bad : C.muted }]} />
           </Animated.View>
         ) : null}
         <View style={styles.qMeta}>
@@ -427,6 +441,7 @@ function LiveRun({
               state={optionState(oi)}
               disabled={run.phase !== 'question' || busy}
               onPress={() => submit(i, oi)}
+              accent={board.color}
             />
           ))}
         </View>
@@ -451,6 +466,16 @@ function LiveRun({
         ) : null}
         {body}
       </Screen>
+      {run?.phase === 'result' && lastAnswer ? (
+        <Animated.View
+          key={`flash-${run.index}`}
+          entering={FadeIn.duration(60)}
+          exiting={FadeOut.duration(400)}
+          pointerEvents="none"
+          style={[styles.flash, { backgroundColor: lastAnswer.correct ? 'rgba(61,242,154,0.10)' : 'rgba(255,84,112,0.12)' }]}
+        />
+      ) : null}
+      {run?.phase === 'summary' && run.total > 0 && !chill ? <Confetti /> : null}
       {moment ? <MomentOverlay key={`${moment}-${momentKey}`} id={moment} chill={chill} onDone={clearMoment} /> : null}
       {confirmQuit ? (
         <View style={styles.scrim}>
@@ -534,7 +559,12 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: S.md },
   already: { ...T.small, color: C.muted, textAlign: 'center', marginBottom: S.sm },
   loading: { paddingVertical: 80, alignItems: 'center' },
-  introEmoji: { fontSize: 56, marginTop: S.lg },
+  introBadge: { width: 92, height: 92, borderRadius: 28, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: S.lg },
+  introEmoji: { fontSize: 50 },
+  callTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.md },
+  streak: { backgroundColor: 'rgba(255,201,64,0.15)', borderColor: 'rgba(255,201,64,0.5)', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  streakText: { color: C.gold, fontFamily: F.black, fontSize: 12 },
+  flash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   introTitle: { ...T.h1, color: C.text, marginTop: S.md },
   introSub: { ...T.body, color: C.muted, marginTop: S.xs },
   rule: { flexDirection: 'row', gap: S.md, alignItems: 'flex-start' },
@@ -549,8 +579,8 @@ const styles = StyleSheet.create({
   lockTag: { backgroundColor: LOCKIN_GOLD, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   lockTagText: { color: '#2A1D00', fontFamily: F.black, fontSize: 12, letterSpacing: 0.6 },
   resultRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  resultWord: { fontFamily: F.display, fontSize: 32 },
-  resultPts: { fontFamily: F.display, fontSize: 32 },
+  resultWord: { fontFamily: F.display, fontSize: 36 },
+  resultPts: { fontFamily: F.display, fontSize: 36 },
   checking: { ...T.small, color: C.muted, textAlign: 'center', marginTop: S.md },
   errorCard: { flexDirection: 'row', alignItems: 'center', gap: S.md, padding: S.lg, marginBottom: S.lg, borderColor: C.bad },
   errorText: { flex: 1, color: C.text, fontFamily: F.medium, fontSize: 14 },

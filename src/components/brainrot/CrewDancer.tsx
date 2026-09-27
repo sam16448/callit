@@ -67,3 +67,18 @@ const styles = StyleSheet.create({
   aura: { position: 'absolute', borderWidth: 3 },
   spark: { position: 'absolute', fontSize: 22 },
 });
+
+/** A crew member idling: a slow bob and sway, for home-screen flair. */
+export function CrewIdle({ id, size = 96 }: { id: CharacterId; size?: number }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.set(withRepeat(withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.sin) }), -1, true));
+    return () => cancelAnimation(t);
+  }, [t]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: -6 * t.get() }, { rotate: `${-4 + 8 * t.get()}deg` }] }));
+  return (
+    <Animated.View style={style} pointerEvents="none">
+      <CharacterArt id={id} size={size} />
+    </Animated.View>
+  );
+}

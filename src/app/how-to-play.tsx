@@ -6,6 +6,7 @@ import { DEFAULT_CAPTIONS, type MomentId } from '@/game/moments';
 import { QUESTION_MS, callRange } from '@/game/scoring';
 import { CALLS } from '@/game/types';
 import { formatPoints } from '@/lib/format';
+import { RANKS } from '@/lib/rank';
 import { C, F, S, T } from '@/theme';
 
 const BIG: MomentId[] = ['lockin_hit', 'lockin_miss', 'allin_hit', 'allin_miss', 'clutch', 'perfect_run', 'new_number_one'];
@@ -42,6 +43,18 @@ export default function HowToPlay() {
         <Text style={styles.fact}>• Wrong or out of time: your week on that board goes to 0.</Text>
         <Text style={styles.fact}>• Only when you have Aura to stake. Two taps to confirm, no take-backs.</Text>
       </Card>
+
+      <SectionLabel>Aura ranks</SectionLabel>
+      <Card style={{ gap: S.sm }}>
+        {RANKS.map((r) => (
+          <View key={r.title} style={styles.row}>
+            <Text style={{ fontSize: 20 }}>{r.emoji}</Text>
+            <Text style={[styles.cell, { fontFamily: F.bold }]}>{r.title}</Text>
+            <Text style={[styles.cell, { color: C.muted, textAlign: 'right' }]}>{r.min === 0 ? 'start' : `${formatPoints(r.min)} Aura`}</Text>
+          </View>
+        ))}
+      </Card>
+      <Text style={styles.note}>Lifetime Aura from every run you play. Weekly boards still reset on Monday.</Text>
 
       <SectionLabel>Fair by design</SectionLabel>
       <Card style={{ gap: S.md }}>

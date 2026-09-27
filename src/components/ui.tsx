@@ -4,7 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { C, F, R, S, T } from '@/theme';
+import { C, F, R, S, T, shade } from '@/theme';
+
+/** Height of the chunky "3D" edge under game buttons; pressing pushes the button down onto it. */
+const LIP = 4;
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -87,27 +90,31 @@ export function Button({
       </Text>
     </View>
   );
+  const fill = primary ? (color ?? C.accent) : variant === 'subtle' ? C.surfaceHi : C.bg;
+  const lip = primary ? shade(fill, -0.45) : variant === 'subtle' ? '#0D0B16' : C.line;
+  const off = disabled || loading;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      disabled={disabled || loading}
+      disabled={off}
       onPress={() => {
         tapLight();
         onPress();
       }}
-      style={({ pressed }) => [(disabled || loading) && { opacity: 0.45 }, pressed && { transform: [{ scale: 0.98 }] }]}
+      style={[styles.buttonLip, { backgroundColor: lip }, off && { opacity: 0.45 }]}
     >
-      <View
-        style={[
-          styles.buttonFill,
-          primary && { backgroundColor: color ?? C.accent },
-          variant === 'ghost' && styles.buttonGhost,
-          variant === 'subtle' && styles.buttonSubtle,
-        ]}
-      >
-        {inner}
-      </View>
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.buttonFill,
+            { backgroundColor: fill, transform: [{ translateY: pressed && !off ? 0 : -LIP }] },
+            variant === 'ghost' && styles.buttonGhost,
+          ]}
+        >
+          {inner}
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -216,11 +223,11 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { marginTop: S.xl, marginBottom: S.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   card: { backgroundColor: C.surface, borderRadius: R.lg, padding: S.xl, borderWidth: StyleSheet.hairlineWidth, borderColor: C.line },
+  buttonLip: { borderRadius: R.md, marginTop: LIP },
   buttonFill: { height: 56, borderRadius: R.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: S.xl },
-  buttonGhost: { borderWidth: 1, borderColor: C.line, backgroundColor: 'transparent' },
-  buttonSubtle: { backgroundColor: C.surfaceHi },
+  buttonGhost: { borderWidth: 1, borderColor: C.line },
   buttonRow: { flexDirection: 'row', alignItems: 'center' },
-  buttonText: { fontFamily: F.bold, fontSize: 16.5 },
+  buttonText: { fontFamily: F.black, fontSize: 17, letterSpacing: 0.2 },
   pill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 10 },
   pillText: { fontSize: 12, fontFamily: F.semibold, letterSpacing: 0.2 },
   backBar: { flexDirection: 'row', alignItems: 'center', marginBottom: S.lg, gap: S.md },
