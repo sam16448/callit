@@ -6,9 +6,12 @@ import { Button, Card, Pill, Screen, SectionLabel, tapLight } from '@/components
 import { BOARDS, boardById, type Board } from '@/game/boards';
 import { formatCountdown, msUntilNextRun, utcDay } from '@/game/time';
 import { formatPoints } from '@/lib/format';
+import { canPractice, practiceLabel } from '@/game/practice';
 import { api, type BoardStatusRow, type TodayRow } from '@/services/api';
+import { practiceServedToday } from '@/services/practice';
 import { isBoardPlayable } from '@/services/questions';
 import { ONLINE } from '@/services/supabase';
+import { useEntitlements } from '@/state/entitlements';
 import { useProfile } from '@/state/profile';
 import { useRuns } from '@/state/runs';
 import { C, F, R, S, T } from '@/theme';
@@ -54,8 +57,26 @@ function useServerToday() {
   return { rows, boards };
 }
 
+/** Practice questions served today, refreshed whenever the tab is shown. */
+function usePracticeServed(day: string) {
+  const [served, setServed] = useState<number | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      practiceServedToday(day)
+        .then((n) => live && setServed(n))
+        .catch(() => {});
+      return () => {
+        live = false;
+      };
+    }, [day]),
+  );
+  return served;
+}
+
 export default function Play() {
   const { profile } = useProfile();
+  const { pro } = useEntitlements();
   const { get } = useRuns();
   const { rows: server, boards: serverBoards } = useServerToday();
   /** Offline: bundled questions decide. Online: the server's board status (open until it has loaded). */
@@ -73,6 +94,12 @@ export default function Play() {
     return null;
   };
   const mixedRun = status('mixed');
+  const practiceServed = usePracticeServed(day);
+  const openPractice = () => {
+    tapLight();
+    if (practiceServed !== null && !canPractice(practiceServed, pro)) router.push({ pathname: '/paywall', params: { reason: 'practice_limit' } });
+    else router.push('/practice');
+  };
   const categories = BOARDS.filter((b) => b.id !== 'mixed');
 
   return (
@@ -114,6 +141,17 @@ export default function Play() {
       <Pressable onPress={() => router.push('/how-to-play')} style={styles.howLink} accessibilityRole="button">
         <Ionicons name="help-circle-outline" size={18} color={C.muted} />
         <Text style={styles.howText}>How scoring works</Text>
+      </Pressable>
+
+      <Pressable onPress={openPractice} accessibilityRole="button" accessibilityLabel="Practice" style={({ pressed }) => [styles.practice, pressed && { opacity: 0.85 }]}>
+        <View style={styles.practiceIcon}>
+          <Ionicons name="barbell-outline" size={22} color={C.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.practiceTitle}>Practice</Text>
+          <Text style={styles.practiceSub}>{practiceServed === null ? "Warm up. Doesn't count for the boards." : practiceLabel(practiceServed, pro)}</Text>
+        </View>
+        {pro ? <Pill text="PRO" color={C.accentInk} filled={C.accent} /> : <Ionicons name="chevron-forward" size={18} color={C.faint} />}
       </Pressable>
 
       <SectionLabel right={<Text style={styles.small}>5 questions · weekly boards</Text>}>Category runs</SectionLabel>
@@ -164,6 +202,19 @@ const styles = StyleSheet.create({
   howLink: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', paddingVertical: S.md, marginTop: S.xs },
   howText: { color: C.muted, fontFamily: F.semibold, fontSize: 13.5 },
   small: { color: C.faint, fontFamily: F.medium, fontSize: 12 },
+  practice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: S.md,
+    backgroundColor: C.surface,
+    borderRadius: R.lg,
+    padding: S.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.line,
+  },
+  practiceIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  practiceTitle: { color: C.text, fontFamily: F.bold, fontSize: 16 },
+  practiceSub: { color: C.muted, fontFamily: F.body, fontSize: 13, marginTop: 1 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: S.sm },
   tile: {
     width: '31.8%',

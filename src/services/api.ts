@@ -8,7 +8,7 @@ import { ensureSession, supabase } from './supabase';
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly code: 'already_played' | 'already_answered' | 'not_signed_in' | 'no_questions' | 'network' | 'other',
+    public readonly code: 'already_played' | 'already_answered' | 'not_signed_in' | 'no_questions' | 'practice_limit' | 'network' | 'other',
   ) {
     super(message);
   }
@@ -20,6 +20,7 @@ export function toApiError(raw: { message?: string } | null | undefined): ApiErr
   if (/already played today/i.test(m)) return new ApiError("You've already played this run today.", 'already_played');
   if (/already answered/i.test(m)) return new ApiError('That question is already answered.', 'already_answered');
   if (/not signed in|JWT|profile missing/i.test(m)) return new ApiError('Signing you in failed. Try again.', 'not_signed_in');
+  if (/practice limit reached/i.test(m)) return new ApiError("That's today's free practice.", 'practice_limit');
   if (/not enough questions/i.test(m)) return new ApiError("This board's questions aren't loaded yet.", 'no_questions');
   if (/fetch|network|timeout|Failed to/i.test(m)) return new ApiError('No connection. Check your internet and try again.', 'network');
   return new ApiError(m, 'other');
@@ -93,6 +94,15 @@ export type RecapRow = {
   category: CategoryId;
 };
 export type BoardRow = { rank: number; user_id: string; nickname: string; avatar: string; is_pro: boolean; total: number; runs: number; is_me: boolean };
+export type PracticeRes = {
+  id: number;
+  category: CategoryId;
+  prompt: string;
+  teaser: string;
+  options: string[];
+  answer_index: number;
+  served_today: number;
+};
 export type BoardStatusRow = { board: BoardId; questions: number; playable: boolean };
 export type LeagueRow = { id: string; code: string; name: string; is_owner: boolean; members: number };
 
@@ -105,6 +115,8 @@ export const api = {
   board: (board: BoardId, leagueId?: string) =>
     rpc<BoardRow[]>('weekly_board', { p_board: board, p_week: null, p_league_id: leagueId ?? null, p_limit: 100 }),
   boardStatus: () => rpc<BoardStatusRow[]>('board_status'),
+  practiceQuestion: (board: BoardId) => rpc<PracticeRes>('practice_question', { p_board: board }),
+  practiceToday: () => rpc<number>('practice_today'),
   myLeagues: () => rpc<LeagueRow[]>('my_leagues'),
   createLeague: (name: string) => rpc<{ id: string; code: string; name: string }>('create_league', { p_name: name }),
   joinLeague: (code: string) => rpc<{ id: string; code: string; name: string }>('join_league', { p_code: code }),

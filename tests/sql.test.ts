@@ -198,15 +198,16 @@ describe('daily sets', () => {
   });
 
   it('avoids repeats while it can, then reuses questions instead of failing', async () => {
-    // tech has 20 questions, 5 per day: 4 fresh days, then it must reuse.
-    const days = ['2030-01-01', '2030-01-02', '2030-01-03', '2030-01-04', '2030-01-05'];
+    // tech has 20 questions: 16 ranked (4 are practice-only), 5 per day → 3 fresh days, then reuse.
+    const days = ['2030-01-01', '2030-01-02', '2030-01-03', '2030-01-04'];
     const sets: number[][] = [];
     for (const d of days) {
       const rows = (await db.query<{ ids: number[] }>('select public.ensure_daily_set($1, $2::date) as ids', ['tech', d])).rows;
       sets.push(rows[0].ids.map(Number));
     }
-    expect(new Set(sets.slice(0, 4).flat()).size).toBe(20);
-    expect(sets[4]).toHaveLength(5);
+    expect(new Set(sets.slice(0, 3).flat()).size).toBe(15);
+    expect(sets[3]).toHaveLength(5);
+    expect(sets.flat().every((id) => id % 5 !== 0)).toBe(true);
   });
 
   it('reports which boards are playable', async () => {
@@ -294,5 +295,40 @@ describe('boards and leagues', () => {
     await rpc(A, 'report_question', ['history', 0, 'The answer looks wrong']);
     const n = (await db.query<{ n: number }>('select count(*)::int as n from public.reports')).rows[0].n;
     expect(n).toBe(1);
+  });
+});
+
+describe('practice', () => {
+  it('serves only practice-pool questions, with the answer, and counts them', async () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 6; i++) {
+      const q = await rpc<{ id: number; options: string[]; answer_index: number; served_today: number; category: string }>(C, 'practice_question', ['history']);
+      expect(Number(q.id) % 5).toBe(0);
+      expect(q.category).toBe('history');
+      expect(q.options[q.answer_index]).toBe('Right');
+      expect(q.served_today).toBe(i + 1);
+      seen.add(Number(q.id));
+    }
+    expect(await rpc(C, 'practice_today')).toBe(6);
+    // Practice questions never show up in ranked daily sets.
+    const ranked = (await db.query<{ ids: number[] }>('select question_ids as ids from public.daily_sets')).rows.flatMap((r) => r.ids.map(Number));
+    expect(ranked.some((id) => seen.has(id))).toBe(false);
+  });
+
+  it('mixes boards for Mixed practice and limits free players once the server enforces Pro', async () => {
+    const q = await rpc<{ category: string }>(B, 'practice_question', ['mixed']);
+    expect(q.category).toBeTruthy();
+    await db.exec(`update public.app_settings set value = 'true' where key = 'enforce_pro_server'`);
+    await db.exec(`update public.practice_log set served = 20 where user_id = '${B}'`);
+    await expectError(rpc(B, 'practice_question', ['mixed']), /practice limit reached/);
+    await db.exec(`update public.profiles set is_pro = true where id = '${B}'`);
+    await expect(rpc(B, 'practice_question', ['mixed'])).resolves.toBeTruthy();
+    await db.exec(`update public.app_settings set value = 'false' where key = 'enforce_pro_server'`);
+    await db.exec(`update public.profiles set is_pro = false where id = '${B}'`);
+  });
+
+  it('keeps the practice log private', async () => {
+    await expectError(asUser(A, 'select * from public.practice_log'), /permission denied/);
+    await expectError(rpc(A, 'is_practice_question', [5]), /permission denied/);
   });
 });

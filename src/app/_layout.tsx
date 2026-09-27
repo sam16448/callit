@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { EntitlementsProvider } from '@/state/entitlements';
 import { ProfileProvider, useProfile } from '@/state/profile';
 import { RunsProvider, useRuns } from '@/state/runs';
 import { C, F, S } from '@/theme';
@@ -53,6 +54,8 @@ function AppStack({ fontsReady }: { fontsReady: boolean }) {
       <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
       <Stack.Screen name="run/[board]" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
       <Stack.Screen name="how-to-play" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+      <Stack.Screen name="practice" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+      <Stack.Screen name="paywall" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
     </Stack>
   );
 }
@@ -73,10 +76,12 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider value={theme}>
           <ProfileProvider>
-            <RunsProvider>
-              <StatusBar style="light" />
-              <AppStack fontsReady={fontsLoaded || Boolean(fontError)} />
-            </RunsProvider>
+            <EntitlementsProvider>
+              <RunsProvider>
+                <StatusBar style="light" />
+                <AppStack fontsReady={fontsLoaded || Boolean(fontError)} />
+              </RunsProvider>
+            </EntitlementsProvider>
           </ProfileProvider>
         </ThemeProvider>
       </SafeAreaProvider>
