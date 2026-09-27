@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Share, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { CallPicker } from '@/components/CallPicker';
 import { CallTag } from '@/components/CallTag';
@@ -18,9 +18,10 @@ import { QUESTION_MS, clampMsLeft } from '@/game/scoring';
 import { nextDayStreak, utcDay } from '@/game/time';
 import type { Call } from '@/game/types';
 import { formatPoints } from '@/lib/format';
-import { recordFromRecap, recordFromRun, shareText } from '@/lib/share';
+import { recordFromRecap, recordFromRun } from '@/lib/share';
 import { ApiError } from '@/services/api';
 import { createDriver, isBoardPlayable } from '@/services/questions';
+import { shareRun } from '@/services/shareCard';
 import { useProfile } from '@/state/profile';
 import { useRuns, type RunRecord } from '@/state/runs';
 import { CALL_COLOR, C, F, R, S, T } from '@/theme';
@@ -33,14 +34,6 @@ function nowMs() {
 function leave() {
   if (router.canGoBack()) router.back();
   else router.replace('/');
-}
-
-async function shareRun(record: RunRecord, boardName: string) {
-  try {
-    await Share.share({ message: shareText(record, boardName) });
-  } catch {
-    // Share sheet closed or not available (e.g. some browsers).
-  }
 }
 
 function messageOf(e: unknown): string {
@@ -100,6 +93,7 @@ function Recap({
   onSave: (r: RunRecord) => void;
   onFinish: (day: string) => number;
 }) {
+  const cardRef = useRef<View>(null);
   // An offline run left half-way (app closed) still counts: close it out once.
   const closed = useRef(false);
   useEffect(() => {
@@ -110,19 +104,19 @@ function Recap({
   }, [saved, onSave, onFinish]);
 
   return (
-    <Screen footer={<SummaryButtons record={saved} boardName={board.name} />}>
+    <Screen footer={<SummaryButtons record={saved} boardName={board.name} cardRef={cardRef} />}>
       <BackBar onBack={leave} close title={`${board.name} · today`} />
       <Text style={styles.already}>You&apos;ve played today&apos;s {board.name} run. New runs every day at 00:00 UTC (5:30 AM IST).</Text>
-      <RunSummary record={saved} boardName={board.name} />
+      <RunSummary record={saved} boardName={board.name} cardRef={cardRef} />
     </Screen>
   );
 }
 
-function SummaryButtons({ record, boardName }: { record: RunRecord; boardName: string }) {
+function SummaryButtons({ record, boardName, cardRef }: { record: RunRecord; boardName: string; cardRef: RefObject<View | null> }) {
   return (
     <View style={styles.footerRow}>
       <View style={{ flex: 1 }}>
-        <Button title="Share" icon="share-outline" variant="subtle" onPress={() => shareRun(record, boardName)} />
+        <Button title="Share" icon="share-outline" variant="subtle" onPress={() => shareRun(record, boardName, cardRef)} />
       </View>
       <View style={{ flex: 1 }}>
         <Button title="Done" onPress={leave} />
@@ -162,6 +156,7 @@ function LiveRun({
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [finalRecord, setFinalRecord] = useState<RunRecord | null>(null);
   const busyRef = useRef(false);
+  const cardRef = useRef<View>(null);
   const finishedRef = useRef(false);
   const recapRequested = useRef(false);
 
@@ -362,10 +357,10 @@ function LiveRun({
         {run.answers.length < run.questionCount && driver.mode === 'online' ? (
           <Text style={styles.already}>Run paused. Come back before 00:00 UTC to finish it.</Text>
         ) : null}
-        <RunSummary record={record} boardName={board.name} />
+        <RunSummary record={record} boardName={board.name} cardRef={cardRef} />
       </>
     );
-    footer = <SummaryButtons record={record} boardName={board.name} />;
+    footer = <SummaryButtons record={record} boardName={board.name} cardRef={cardRef} />;
   } else if (run && run.phase === 'call') {
     body = run.teaser ? (
       <Animated.View key={`call-${run.index}`} entering={FadeInDown.duration(260)}>

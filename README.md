@@ -27,12 +27,22 @@ Built with Expo SDK 57 for the RevenueCat Shipaton 2026 Next Gen Award.
 | Part | State |
 | --- | --- |
 | Onboarding (nickname + avatar, no password), Play tab, full run: call → question → result → summary | ✅ |
-| Scoring, moments, daily runs, share text | ✅ tested |
-| Supabase schema, security, server scoring, weekly boards, leagues backend | ✅ tested on real Postgres |
-| Question importer (Open Trivia DB → 16 boards) | ✅ |
-| Live Board tab (Top / Near you), resume a paused run | ✅ |
-| RevenueCat Pro + paywall, leagues screens + invite links, share card | ⏳ next |
-| Effects (Skia/Lottie), CC0 sounds, Cricket & Bollywood questions | ⏳ |
+| Scoring, moments, daily runs, resume a paused run | ✅ tested |
+| Supabase: server scoring, security, weekly boards, 4,933 Open Trivia DB questions on 14 boards | ✅ live, tested on real Postgres |
+| Call It Pro with RevenueCat: paywall per reason, restore, preview mode in Expo Go | ✅ |
+| Practice (separate question pool, 20 free a day, unlimited with Pro) | ✅ |
+| Leagues: join with a code (free), create (Pro), league boards, `callit://join/CODE` invites | ✅ |
+| RevenueCat webhook → server-side Pro (expiry-safe), Pro badge on boards | ✅ live |
+| Share card image (score, grid, biggest moment, no spoilers) | ✅ |
+| Effects (Skia/Lottie), CC0 sounds, stats, streak shield, Cricket & Bollywood questions | ⏳ |
+
+## How Call It uses RevenueCat
+
+- **One entitlement, two products**: `pro` from `callit_pro_monthly` ($2.99) and `callit_pro_annual` ($14.99) in the `default` offering. Prices on the paywall come from RevenueCat, so they're localised by the store.
+- **Paywall only at natural moments**, each with its own honest headline: the 21st practice question, creating a league, and later stats / streak shield / effects. It never interrupts a ranked run, and perks not built yet are labelled *Soon*.
+- **Never pay-to-win**: ranked runs are free, one attempt, the same for everyone; Pro changes no score. The paywall says so.
+- **Same identity everywhere**: RevenueCat logs in with the Supabase player id, so the **webhook** (`supabase/functions/revenuecat-webhook`) can keep `profiles.is_pro` / `pro_until` in sync on the server: purchases, renewals, cancellations (Pro until expiry), expirations and transfers, with retries ignored by event id.
+- **Works everywhere**: live purchases in development/store builds; a labelled preview mode in Expo Go; a demo mode with no key for anyone running the open-source repo.
 
 ## Run it
 
@@ -51,7 +61,7 @@ Checks: `npm run lint`, `npm run typecheck`, `npm test`.
 
 ## Tests
 
-`npm test` runs 77 tests, including:
+`npm test` runs 100 tests, including:
 
 - `tests/sql.test.ts` runs the **real database migration** on an in-memory Postgres ([PGlite](https://pglite.dev)): scoring matches the app for every call and time, no double answers or skipping ahead, timeouts, lag grace, streaks, leaderboards, leagues and the security rules.
 - `tests/online.test.ts` plays the app's **online driver against that database**: full runs, resuming a half-finished run, errors and the leaderboard.

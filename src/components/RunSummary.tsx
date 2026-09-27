@@ -1,14 +1,17 @@
+import type { RefObject } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { CallTag } from '@/components/CallTag';
+import { ShareCard } from '@/components/ShareCard';
 import { Card, SectionLabel } from '@/components/ui';
-import { DEFAULT_CAPTIONS } from '@/game/moments';
 import { formatPoints } from '@/lib/format';
+import { useProfile } from '@/state/profile';
 import type { RunRecord } from '@/state/runs';
 import { C, F, S, T } from '@/theme';
 
 /** End-of-run recap, built from the saved record so it looks the same when reopened later. */
-export function RunSummary({ record, boardName }: { record: RunRecord; boardName: string }) {
+export function RunSummary({ record, boardName, cardRef }: { record: RunRecord; boardName: string; cardRef?: RefObject<View | null> }) {
+  const { profile } = useProfile();
   const questions = record.questions ?? [];
   const correct = record.answers.filter((a) => a.correct).length;
   const allins = record.answers.filter((a) => a.call === 'allin');
@@ -18,15 +21,15 @@ export function RunSummary({ record, boardName }: { record: RunRecord; boardName
     cur = a.correct ? cur + 1 : 0;
     best = Math.max(best, cur);
   }
-  const big = record.biggest ? DEFAULT_CAPTIONS[record.biggest] : null;
   const unanswered = record.questionCount - record.answers.length;
 
   return (
     <View>
-      <Animated.View entering={FadeInDown.duration(300)} style={styles.head}>
-        <Text style={[T.label, { color: C.accent }]}>{boardName} · {record.answers.length < record.questionCount ? 'run so far' : 'run complete'}</Text>
-        <Text style={styles.total}>{formatPoints(record.total)}</Text>
-        <Text style={styles.grid}>{record.grid}</Text>
+      <Text style={[T.label, { color: C.accent, textAlign: 'center', marginBottom: S.md }]}>
+        {boardName} · {record.answers.length < record.questionCount ? 'run so far' : 'run complete'}
+      </Text>
+      <Animated.View entering={FadeInDown.duration(300)}>
+        <ShareCard ref={cardRef} record={record} boardName={boardName} nickname={profile?.nickname} avatar={profile?.avatar} />
       </Animated.View>
 
       <View style={styles.stats}>
@@ -34,17 +37,6 @@ export function RunSummary({ record, boardName }: { record: RunRecord; boardName
         <Stat label="All-in hits" value={`${allins.filter((a) => a.correct).length}/${allins.length}`} />
         <Stat label="Best streak" value={String(best)} />
       </View>
-
-      {big ? (
-        <Card style={styles.big}>
-          <Text style={styles.bigEmoji}>{big.emoji}</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={[T.label, { color: C.muted }]}>Biggest moment</Text>
-            <Text style={styles.bigTitle}>{big.title}</Text>
-            <Text style={styles.bigSub}>{big.sub}</Text>
-          </View>
-        </Card>
-      ) : null}
 
       <SectionLabel>Question by question</SectionLabel>
       <Card style={{ paddingVertical: S.sm }}>
@@ -86,16 +78,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  head: { alignItems: 'center', marginTop: S.md },
-  total: { fontFamily: F.display, color: C.text, fontSize: 72, letterSpacing: -2, marginTop: S.sm },
-  grid: { fontSize: 20, letterSpacing: 2, marginTop: S.xs },
   stats: { flexDirection: 'row', gap: S.sm, marginTop: S.xl },
   stat: { flex: 1, backgroundColor: C.surface, borderRadius: 16, padding: S.md, borderWidth: StyleSheet.hairlineWidth, borderColor: C.line },
   statValue: { fontFamily: F.display, color: C.text, fontSize: 24, marginTop: 4 },
-  big: { flexDirection: 'row', alignItems: 'center', gap: S.lg, marginTop: S.md, padding: S.lg },
-  bigEmoji: { fontSize: 40 },
-  bigTitle: { fontFamily: F.display, color: C.text, fontSize: 24, marginTop: 2 },
-  bigSub: { color: C.muted, fontFamily: F.body, fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: S.md, paddingVertical: S.md },
   rowLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   num: { width: 18, color: C.faint, fontFamily: F.display, fontSize: 14 },
