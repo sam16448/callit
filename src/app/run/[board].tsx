@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { CallPicker } from '@/components/CallPicker';
+import { CallPicker, LOCKIN_GOLD } from '@/components/CallPicker';
 import { CallTag } from '@/components/CallTag';
 import { MomentOverlay } from '@/components/MomentOverlay';
 import { OptionButton, type OptionState } from '@/components/OptionButton';
@@ -15,7 +15,7 @@ import type { RunDriver } from '@/game/driver';
 import type { MomentId } from '@/game/moments';
 import { runReducer, startRun, type RunAction, type RunState } from '@/game/run';
 import { QUESTION_MS, clampMsLeft } from '@/game/scoring';
-import { nextDayStreak, utcDay } from '@/game/time';
+import { nextDayStreak, utcDay, weekStart } from '@/game/time';
 import type { Call } from '@/game/types';
 import { formatPoints } from '@/lib/format';
 import { recordFromRecap, recordFromRun } from '@/lib/share';
@@ -57,9 +57,15 @@ export default function RunScreen() {
 
 function Run({ board }: { board: Board }) {
   const { profile, recordPlay } = useProfile();
-  const { get, save } = useRuns();
+  const { get, save, runs } = useRuns();
   const [day] = useState(() => utcDay());
-  const driver = useMemo(() => createDriver(board.id, day), [board.id, day]);
+  // Offline, Lock-In stakes this week's earlier runs on the board too (online the server knows).
+  const [priorWeek] = useState(() =>
+    Object.values(runs)
+      .filter((r) => r.board === board.id && r.day >= weekStart() && r.day < day)
+      .reduce((sum, r) => sum + r.total, 0),
+  );
+  const driver = useMemo(() => createDriver(board.id, day, priorWeek), [board.id, day, priorWeek]);
   // What was saved when the screen opened: one attempt per board per day.
   const [savedAtOpen] = useState(() => get(day, board.id));
   const [finished, setFinished] = useState<RunRecord | null>(null);
@@ -216,10 +222,10 @@ function LiveRun({
     (i: number) =>
       step(async () => {
         const t = await driver.teaser(i);
-        dispatch({ type: 'TEASER', teaser: { teaser: t.teaser, category: t.category } });
+        dispatch({ type: 'TEASER', teaser: { teaser: t.teaser, category: t.category, lockinStake: t.lockinStake } });
         if (t.call) {
-          const r = await driver.call(i, t.call);
-          dispatch({ type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
+          const r = await driver.call(i, t.call, t.lockin);
+          dispatch({ type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt, lockin: r.lockin, stake: r.stake });
         }
       }),
     [driver, step, dispatch],
@@ -230,13 +236,13 @@ function LiveRun({
     if (needsTeaser && index !== undefined && !busy && !hasError) loadTeaser(index);
   }, [needsTeaser, index, busy, hasError, loadTeaser]);
 
-  const place = (call: Call) => {
+  const place = (call: Call, lockin = false) => {
     if (!run) return;
     const i = run.index;
     step(async () => {
-      const r = await driver.call(i, call);
+      const r = await driver.call(i, call, lockin);
       setMsLeft(QUESTION_MS);
-      dispatch({ type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt });
+      dispatch({ type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt, lockin: r.lockin, stake: r.stake });
     });
   };
 
@@ -317,7 +323,7 @@ function LiveRun({
       onBack={onClose}
       close
       title={run && run.phase !== 'summary' ? `${board.name} · ${Math.min(run.index + 1, run.questionCount)}/${run.questionCount}` : board.name}
-      right={run ? <Pill text={`${formatPoints(run.total)} pts`} color={C.text} filled={C.surfaceHi} /> : undefined}
+      right={run ? <Pill text={`${formatPoints(run.total)} Aura`} color={C.text} filled={C.surfaceHi} /> : undefined}
     />
   );
 
@@ -342,7 +348,7 @@ function LiveRun({
         ) : (
           <Card style={{ marginTop: S.xl, gap: S.lg }}>
             <Rule icon="eye-outline" text="You see the opening words of each question first." />
-            <Rule icon="flash-outline" text="Then call it: Safe 1×, Sure 2× or All-in 3×. Wrong calls cost points." />
+            <Rule icon="flash-outline" text="Then call it: Safe 1×, Sure 2× or All-in 3×. Wrong calls cost Aura." />
             <Rule icon="timer-outline" text="The options appear and the 15-second clock starts. Faster = up to +50 bonus." />
             <Rule icon="lock-closed-outline" text="Once you start, this is your one attempt for today." />
           </Card>
@@ -371,7 +377,7 @@ function LiveRun({
         </Card>
         <Text style={styles.callPrompt}>Make your call</Text>
         <View pointerEvents={busy ? 'none' : 'auto'} style={busy ? { opacity: 0.6 } : undefined}>
-          <CallPicker onCall={place} />
+          <CallPicker onCall={place} lockinStake={run.teaser.lockinStake} onLockIn={() => place('allin', true)} />
         </View>
       </Animated.View>
     ) : (
@@ -402,7 +408,13 @@ function LiveRun({
           </Animated.View>
         ) : null}
         <View style={styles.qMeta}>
-          <CallTag call={run.call} size="md" />
+          {run.lockin ? (
+            <View style={styles.lockTag}>
+              <Text style={styles.lockTagText}>🔒 LOCK-IN · {formatPoints(run.stake)} AURA</Text>
+            </View>
+          ) : (
+            <CallTag call={run.call} size="md" />
+          )}
           <Text style={[T.label, { color: C.faint }]}>{categoryLabel(run.teaser.category)}</Text>
         </View>
         <Text style={styles.prompt}>{run.revealed.prompt}</Text>
@@ -447,7 +459,7 @@ function LiveRun({
             <Text style={[T.body, { color: C.muted, marginTop: S.sm }]}>
               {driver.mode === 'online'
                 ? 'You can finish it later today. If a question is showing, the clock keeps running and it counts as a timeout.'
-                : "It still counts as today's attempt. Questions you haven't answered score 0. The clock keeps running while you decide."}
+                : "It still counts as today's attempt. Questions you haven't answered get 0 Aura. The clock keeps running while you decide."}
             </Text>
             <View style={[styles.footerRow, { marginTop: S.xl }]}>
               <View style={{ flex: 1 }}>
@@ -534,6 +546,8 @@ const styles = StyleSheet.create({
   callPrompt: { ...T.label, color: C.accent, marginTop: S.xl, marginBottom: S.md },
   qMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: S.xl },
   prompt: { fontFamily: F.display, color: C.text, fontSize: 25, lineHeight: 32, marginTop: S.md },
+  lockTag: { backgroundColor: LOCKIN_GOLD, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  lockTagText: { color: '#2A1D00', fontFamily: F.black, fontSize: 12, letterSpacing: 0.6 },
   resultRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   resultWord: { fontFamily: F.display, fontSize: 32 },
   resultPts: { fontFamily: F.display, fontSize: 32 },

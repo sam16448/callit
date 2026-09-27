@@ -20,6 +20,8 @@ export function toApiError(raw: { message?: string } | null | undefined): ApiErr
   if (/already played today/i.test(m)) return new ApiError("You've already played this run today.", 'already_played');
   if (/already answered/i.test(m)) return new ApiError('That question is already answered.', 'already_answered');
   if (/not signed in|JWT|profile missing/i.test(m)) return new ApiError('Signing you in failed. Try again.', 'not_signed_in');
+  if (/nothing to lock in/i.test(m)) return new ApiError('Nothing to lock in yet: win some Aura on this board first.', 'other');
+  if (/lock-in already used/i.test(m)) return new ApiError('You already used your Lock-In this run.', 'other');
   if (/practice limit reached/i.test(m)) return new ApiError("That's today's free practice.", 'practice_limit');
   if (/not enough questions/i.test(m)) return new ApiError("This board's questions aren't loaded yet.", 'no_questions');
   if (/fetch|network|timeout|Failed to/i.test(m)) return new ApiError('No connection. Check your internet and try again.', 'network');
@@ -66,8 +68,10 @@ export type TeaserRes = {
   teaser: string;
   total: number;
   call: Call | null;
+  lockin: boolean;
+  lockin_stake: number | null;
 };
-export type CallRes = { q_index: number; call: Call; prompt: string; options: string[]; shown_at: string; server_now: string };
+export type CallRes = { q_index: number; call: Call; lockin: boolean; stake: number; prompt: string; options: string[]; shown_at: string; server_now: string };
 export type AnswerRes = {
   q_index: number;
   call: Call;
@@ -79,11 +83,15 @@ export type AnswerRes = {
   total: number;
   answered: number;
   finished: boolean;
+  lockin: boolean;
+  stake: number;
 };
 export type TodayRow = { board: BoardId; total: number; answered: number; correct: number; question_count: number; finished: boolean };
 export type RecapRow = {
   q_index: number;
   call: Call;
+  lockin: boolean;
+  stake: number;
   choice: number | null;
   correct: boolean;
   ms_left: number;
@@ -108,7 +116,8 @@ export type LeagueRow = { id: string; code: string; name: string; is_owner: bool
 
 export const api = {
   teaser: (board: BoardId, i: number) => rpc<TeaserRes>('get_teaser', { p_board: board, p_q_index: i }),
-  call: (board: BoardId, i: number, call: Call) => rpc<CallRes>('place_call', { p_board: board, p_q_index: i, p_call: call }),
+  call: (board: BoardId, i: number, call: Call, lockin = false) =>
+    rpc<CallRes>('place_call', { p_board: board, p_q_index: i, p_call: call, p_lockin: lockin }),
   answer: (board: BoardId, i: number, choice: number | null) => rpc<AnswerRes>('submit_answer', { p_board: board, p_q_index: i, p_choice: choice }),
   today: () => rpc<TodayRow[]>('my_today'),
   recap: (board: BoardId, day?: string) => rpc<RecapRow[] | null>('run_recap', { p_board: board, p_day: day ?? null }),

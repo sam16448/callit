@@ -4,47 +4,36 @@ export type Board = {
   id: BoardId;
   name: string;
   emoji: string;
+  /** One line on the board's tile and run intro. */
+  tagline: string;
   /** Questions in that day's run. */
   runLength: number;
-  /** Open Trivia DB category names that feed this board (empty = our own questions). */
-  sources: string[];
 };
 
 export const MIXED_RUN_LENGTH = 10;
 export const CATEGORY_RUN_LENGTH = 5;
 
-const cat = (id: CategoryId, name: string, emoji: string, sources: string[]): Board => ({
+const cat = (id: CategoryId, name: string, emoji: string, tagline: string): Board => ({
   id,
   name,
   emoji,
+  tagline,
   runLength: CATEGORY_RUN_LENGTH,
-  sources,
 });
 
-/** All 16 boards, in the order they appear in the app. */
+/** All boards, in the order they appear in the app. */
 export const BOARDS: readonly Board[] = [
-  { id: 'mixed', name: 'Mixed', emoji: '🌍', runLength: MIXED_RUN_LENGTH, sources: [] },
-  cat('video-games', 'Video Games', '🎮', ['Entertainment: Video Games']),
-  cat('music', 'Music', '🎵', ['Entertainment: Music']),
-  cat('general', 'General Knowledge', '🧠', ['General Knowledge']),
-  cat('history', 'History', '🏛️', ['History']),
-  cat('geography', 'Geography', '🗺️', ['Geography']),
-  cat('film', 'Film', '🎬', ['Entertainment: Film']),
-  cat('science', 'Science & Nature', '🔬', ['Science & Nature']),
-  cat('pop-culture', 'Pop Culture', '✨', [
-    'Celebrities',
-    'Entertainment: Cartoon & Animations',
-    'Entertainment: Comics',
-    'Entertainment: Musicals & Theatres',
-  ]),
-  cat('tech', 'Tech', '💻', ['Science: Computers', 'Science: Gadgets']),
-  cat('anime', 'Anime & Manga', '🍥', ['Entertainment: Japanese Anime & Manga']),
-  cat('tv', 'TV', '📺', ['Entertainment: Television']),
-  cat('books-art', 'Books & Art', '📚', ['Entertainment: Books', 'Art']),
-  cat('sports', 'Sports', '⚽', ['Sports']),
-  cat('mind-games', 'Mind Games', '♟️', ['Science: Mathematics', 'Entertainment: Board Games']),
-  cat('cricket', 'Cricket', '🏏', []),
-  cat('bollywood', 'Bollywood', '🎞️', []),
+  { id: 'mixed', name: 'Mixed', emoji: '🌍', tagline: 'A bit of everything. The global board.', runLength: MIXED_RUN_LENGTH },
+  cat('memes', 'Ball Knowledge', '🧠', 'Memes and internet moments since 2022'),
+  cat('trends', 'Trends', '📈', 'What blew up on Insta and TikTok'),
+  cat('brainrot', 'Brainrot', '🗿', 'Lore only the chronically online know'),
+  cat('f1', 'F1', '🏎️', 'Drivers, drama, radio messages'),
+  cat('football', 'Football', '⚽', 'Real ball knowledge'),
+  cat('cricket', 'Cricket', '🏏', 'IPL, India and the big moments'),
+  cat('gaming', 'Gaming', '🎮', 'Games everyone is playing'),
+  cat('pop-culture', 'Pop Culture', '🎬', 'Music, movies, celebs'),
+  cat('anime', 'Anime', '🍥', 'Seasonal hits and the classics'),
+  cat('tech-ai', 'Tech & AI', '🤖', 'Gadgets, AI and the internet itself'),
 ];
 
 export function boardById(id: string): Board | undefined {

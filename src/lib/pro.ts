@@ -9,7 +9,7 @@ export const FREE_PRACTICE_PER_DAY = 20;
 export const PAYWALL_COPY: Record<PaywallReason, { title: string; sub: string }> = {
   practice_limit: {
     title: "That's today's 20 free practice questions",
-    sub: 'Pro gives unlimited practice. Ranked runs stay free, and practice never counts for the boards.',
+    sub: 'Pro gives unlimited practice. Ranked runs stay free, and practice Aura never counts for the boards.',
   },
   create_league: {
     title: 'Start your own league',
@@ -25,11 +25,11 @@ export const PAYWALL_COPY: Record<PaywallReason, { title: string; sub: string }>
   },
   effects: {
     title: 'Cosmetic effect packs',
-    sub: 'Pro unlocks extra looks for your moments. Purely cosmetic: they never change your score.',
+    sub: 'Pro unlocks extra looks for your moments. Purely cosmetic: they never change your Aura.',
   },
   you: {
     title: 'Call It Pro',
-    sub: 'More game, never more points.',
+    sub: 'More game, never more Aura.',
   },
 };
 

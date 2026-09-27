@@ -140,7 +140,7 @@ export default function Practice() {
       onBack={leave}
       close
       title={started ? `Practice · ${boardById(board)?.name ?? ''}` : 'Practice'}
-      right={started ? <Pill text={`${formatPoints(run.total)} pts`} color={C.text} filled={C.surfaceHi} /> : undefined}
+      right={started ? <Pill text={`${formatPoints(run.total)} Aura`} color={C.text} filled={C.surfaceHi} /> : undefined}
     />
   );
 
@@ -154,7 +154,7 @@ export default function Practice() {
         <Text style={styles.sub}>Same calls, same clock, same scoring. Nothing here counts for the boards, and practice questions never appear in ranked runs.</Text>
         <Text style={[T.label, { color: C.muted, marginTop: S.xl, marginBottom: S.md }]}>Pick a topic</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chips}>
-          {BOARDS.filter((b) => !['cricket', 'bollywood'].includes(b.id)).map((b) => {
+          {BOARDS.map((b) => {
             const on = b.id === board;
             return (
               <Pressable

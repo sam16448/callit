@@ -25,7 +25,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
     <View style={styles.errorRoot}>
       <Text style={styles.errorTitle}>Something broke</Text>
-      <Text style={styles.errorBody}>Call It hit an unexpected problem. Your profile and scores are safe on this phone.</Text>
+      <Text style={styles.errorBody}>Call It hit an unexpected problem. Your profile and Aura are safe on this phone.</Text>
       <Text style={styles.errorDetail} numberOfLines={3}>
         {error.message}
       </Text>

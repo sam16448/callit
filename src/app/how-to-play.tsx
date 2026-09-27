@@ -8,14 +8,14 @@ import { CALLS } from '@/game/types';
 import { formatPoints } from '@/lib/format';
 import { C, F, S, T } from '@/theme';
 
-const BIG: MomentId[] = ['allin_hit', 'allin_miss', 'clutch', 'perfect_run', 'new_number_one'];
+const BIG: MomentId[] = ['lockin_hit', 'lockin_miss', 'allin_hit', 'allin_miss', 'clutch', 'perfect_run', 'new_number_one'];
 const SMALL: MomentId[] = ['speedrun', 'heating_up', 'unstoppable', 'six_seven', 'streak_milestone'];
 
 export default function HowToPlay() {
   return (
     <Screen>
       <BackBar onBack={() => router.back()} close title="How to play" />
-      <Text style={[T.h1, { color: C.text }]}>Read it. Call it. Answer it.</Text>
+      <Text style={[T.h1, { color: C.text }]}>Got ball? Prove it.</Text>
       <Text style={[T.body, { color: C.muted, marginTop: S.sm }]}>
         Each question shows its opening words first. Decide how sure you are before you see the options, then you have {QUESTION_MS / 1000} seconds.
       </Text>
@@ -35,11 +35,19 @@ export default function HowToPlay() {
       </Card>
       <Text style={styles.note}>Right = (100 + speed bonus up to 50) × your call. Running out of time counts as wrong.</Text>
 
+      <SectionLabel>Generational Lock-In 🔒</SectionLabel>
+      <Card style={{ gap: S.sm }}>
+        <Text style={styles.fact}>Once per run, after reading the opening words, you can stake your whole week&apos;s Aura on that board.</Text>
+        <Text style={styles.fact}>• Right: your week doubles (plus the All-in points).</Text>
+        <Text style={styles.fact}>• Wrong or out of time: your week on that board goes to 0.</Text>
+        <Text style={styles.fact}>• Only when you have Aura to stake. Two taps to confirm, no take-backs.</Text>
+      </Card>
+
       <SectionLabel>Fair by design</SectionLabel>
       <Card style={{ gap: S.md }}>
         <Text style={styles.fact}>• Every ranked run is free, one attempt, and the same for everyone that day.</Text>
         <Text style={styles.fact}>• Only the Mixed run counts for the global board, so playing more categories can&apos;t buy rank.</Text>
-        <Text style={styles.fact}>• Call It Pro never gives points. It&apos;s practice, leagues, stats and cosmetics.</Text>
+        <Text style={styles.fact}>• Call It Pro never gives Aura. It&apos;s practice, leagues, stats and cosmetics.</Text>
         <Text style={styles.fact}>• New runs at 00:00 UTC (5:30 AM IST). Weekly boards reset Monday.</Text>
       </Card>
 

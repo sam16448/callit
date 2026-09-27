@@ -10,7 +10,12 @@ import type { AnswerRecord, Call, CategoryId, Question } from './types';
 
 export type Phase = 'call' | 'question' | 'result' | 'summary';
 
-export type TeaserInfo = { teaser: string; category: CategoryId };
+export type TeaserInfo = {
+  teaser: string;
+  category: CategoryId;
+  /** Aura that Generational Lock-In would stake right now, or null/undefined if it isn't available. */
+  lockinStake?: number | null;
+};
 export type Revealed = { prompt: string; options: string[] };
 
 /** What the driver reports after an answer (or a timeout: choice null). */
@@ -22,6 +27,8 @@ export type Outcome = {
   points: number;
   /** Running total from the server; worked out locally when missing. */
   total?: number;
+  lockin?: boolean;
+  stake?: number;
   questionId?: string;
 };
 
@@ -32,6 +39,9 @@ export type RunState = {
   /** Null while the next teaser is loading. */
   teaser: TeaserInfo | null;
   call: Call | null;
+  /** This question is a Generational Lock-In, with this much Aura staked. */
+  lockin: boolean;
+  stake: number;
   /** When the options appeared, on this phone's clock (ms). */
   shownAt: number | null;
   revealed: Revealed | null;
@@ -50,7 +60,7 @@ export type RunState = {
 
 export type RunAction =
   | { type: 'TEASER'; teaser: TeaserInfo }
-  | { type: 'CALLED'; call: Call; revealed: Revealed; shownAt: number }
+  | { type: 'CALLED'; call: Call; revealed: Revealed; shownAt: number; lockin?: boolean; stake?: number }
   | { type: 'ANSWERED'; outcome: Outcome }
   | { type: 'NEXT'; dayStreak?: number; isNewNumberOne?: boolean }
   | { type: 'QUIT' };
@@ -63,6 +73,8 @@ export function startRun(questionCount: number, opts: { chill?: boolean; startIn
     phase: questionCount > index ? 'call' : 'summary',
     teaser: null,
     call: null,
+    lockin: false,
+    stake: 0,
     shownAt: null,
     revealed: null,
     questions: [],
@@ -82,7 +94,7 @@ export function runReducer(s: RunState, a: RunAction): RunState {
       return { ...s, teaser: a.teaser };
     case 'CALLED':
       if (s.phase !== 'call' || !s.teaser) return s;
-      return { ...s, phase: 'question', call: a.call, revealed: a.revealed, shownAt: a.shownAt };
+      return { ...s, phase: 'question', call: a.call, revealed: a.revealed, shownAt: a.shownAt, lockin: Boolean(a.lockin), stake: a.stake ?? 0 };
     case 'ANSWERED': {
       if (s.phase !== 'question' || !s.call || !s.revealed || !s.teaser) return s;
       const o = a.outcome;
@@ -104,6 +116,7 @@ export function runReducer(s: RunState, a: RunAction): RunState {
         msLeft: o.msLeft,
         points: o.points,
         total,
+        ...(s.lockin || o.lockin ? { lockin: true, stake: o.stake ?? s.stake } : {}),
       };
       const answers = [...s.answers, answer];
       const triggered = questionMoments(answers);
@@ -120,7 +133,7 @@ export function runReducer(s: RunState, a: RunAction): RunState {
     case 'NEXT': {
       if (s.phase !== 'result') return s;
       const index = s.index + 1;
-      const cleared = { call: null, shownAt: null, revealed: null, teaser: null, spotlight: null };
+      const cleared = { call: null, shownAt: null, revealed: null, teaser: null, spotlight: null, lockin: false, stake: 0 };
       if (index < s.questionCount) return { ...s, ...cleared, index, phase: 'call' };
       const endMoments = runMoments(s.answers, {
         questionCount: s.questionCount,
@@ -138,7 +151,7 @@ export function runReducer(s: RunState, a: RunAction): RunState {
 }
 
 /** Wordle-style row of squares: one per question. */
-export function gridFor(answers: readonly Pick<AnswerRecord, 'call' | 'correct'>[], questionCount: number): string {
+export function gridFor(answers: readonly Pick<AnswerRecord, 'call' | 'correct' | 'lockin'>[], questionCount: number): string {
   const glyph: Record<Call, [string, string]> = {
     safe: ['🟦', '⬜'],
     sure: ['🟩', '🟥'],
@@ -146,7 +159,9 @@ export function gridFor(answers: readonly Pick<AnswerRecord, 'call' | 'correct'>
   };
   return Array.from({ length: questionCount }, (_, i) => {
     const a = answers[i];
-    return a ? glyph[a.call][a.correct ? 0 : 1] : '▫️';
+    if (!a) return '▫️';
+    if (a.lockin) return a.correct ? '🔒' : '📉';
+    return glyph[a.call][a.correct ? 0 : 1];
   }).join('');
 }
 

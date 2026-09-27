@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SAMPLE_QUESTIONS } from '@/data/sampleQuestions';
+import { fixtureQuestions } from './helpers/fixtures';
 import { BOARDS } from '@/game/boards';
 import { dailyRun, hasRun, seededShuffle } from '@/game/dailySet';
 import type { RunDriver } from '@/game/driver';
@@ -11,6 +12,7 @@ import { formatCountdown, msUntilNextRun, nextDayStreak, utcDay, weekStart } fro
 import type { Call, Question } from '@/game/types';
 
 const DAY = '2026-09-27';
+const FIX = fixtureQuestions();
 
 /** A fake clock the tests move by hand. */
 function fakeClock(start = 1_000_000) {
@@ -90,23 +92,24 @@ describe('dailyRun', () => {
     expect(a).not.toEqual(c);
   });
 
-  it('gives Mixed 10 questions spread across all six categories', () => {
+  it('gives Mixed 10 questions, one from each board', () => {
     const run = dailyRun('mixed', DAY, SAMPLE_QUESTIONS);
     expect(run).toHaveLength(10);
     expect(new Set(run.map((q) => q.id)).size).toBe(10);
-    expect(new Set(run.map((q) => q.category)).size).toBe(6);
+    expect(new Set(run.map((q) => q.category)).size).toBe(10);
   });
 
   it('gives category runs 5 questions from that category only', () => {
-    const run = dailyRun('science', DAY, SAMPLE_QUESTIONS);
+    const run = dailyRun('f1', DAY, FIX);
     expect(run).toHaveLength(5);
-    expect(run.every((q) => q.category === 'science')).toBe(true);
+    expect(run.every((q) => q.category === 'f1')).toBe(true);
   });
 
   it('knows which boards have enough questions offline', () => {
+    // 3 samples per board: offline, only Mixed can make a full run (practice covers every board).
     expect(hasRun('mixed', SAMPLE_QUESTIONS)).toBe(true);
-    expect(hasRun('tech', SAMPLE_QUESTIONS)).toBe(true);
-    expect(hasRun('cricket', SAMPLE_QUESTIONS)).toBe(false);
+    expect(hasRun('f1', SAMPLE_QUESTIONS)).toBe(false);
+    expect(hasRun('f1', FIX)).toBe(true);
   });
 
   it('seededShuffle keeps every item', () => {
@@ -116,7 +119,7 @@ describe('dailyRun', () => {
 });
 
 describe('run state machine with the offline driver', () => {
-  const questions = dailyRun('tech', DAY, SAMPLE_QUESTIONS);
+  const questions = dailyRun('gaming', DAY, FIX);
 
   it('goes teaser → call → question → result and ends on the summary', async () => {
     const clock = fakeClock();
@@ -222,6 +225,35 @@ describe('run state machine with the offline driver', () => {
     expect(shareGrid(s)).toBe('🟪🟥⬜🟦🟩');
     const recap = await d.recap();
     expect(recap.map((r) => r.points)).toEqual(s.answers.map((a) => a.points));
+  });
+
+  it('Lock-In: stakes the week, doubles it on a hit, zeroes it on a miss, once per run', async () => {
+    const clock = fakeClock();
+    // 200 Aura from earlier runs this week on this board.
+    const d = createOfflineDriver(questions, clock.now, 200);
+    let s = startRun(questions.length);
+    const t0 = await d.teaser(0);
+    expect(t0.lockinStake).toBe(200);
+    s = runReducer(s, { type: 'TEASER', teaser: t0 });
+    const r = await d.call(0, 'safe', true);
+    expect(r).toMatchObject({ call: 'allin', lockin: true, stake: 200 });
+    s = runReducer(s, { type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt, lockin: r.lockin, stake: r.stake });
+    clock.advance(0);
+    s = runReducer(s, { type: 'ANSWERED', outcome: await d.answer(0, questions[0].answerIndex) });
+    expect(s.answers[0]).toMatchObject({ lockin: true, stake: 200, points: 650 }); // 450 + 200
+    expect(s.spotlight).toBe('lockin_hit');
+    expect(shareGrid({ ...s, questionCount: 1 })).toBe('🔒');
+    expect((await d.teaser(1)).lockinStake).toBeNull(); // used
+    await expect(d.call(1, 'sure', true)).rejects.toThrow(/already used/);
+
+    const miss = createOfflineDriver(questions, clock.now, 300);
+    await miss.call(0, 'sure', true);
+    clock.advance(2_000);
+    const out = await miss.answer(0, (questions[0].answerIndex + 1) % questions[0].options.length);
+    expect(out).toMatchObject({ points: -300, total: -300, lockin: true }); // week 300 → 0
+    const none = createOfflineDriver(questions, clock.now, 0);
+    expect((await none.teaser(0)).lockinStake).toBeNull();
+    await expect(none.call(0, 'safe', true)).rejects.toThrow(/Nothing to lock in/);
   });
 
   it('can start part-way through (resuming a run)', () => {

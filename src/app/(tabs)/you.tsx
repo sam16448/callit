@@ -39,7 +39,7 @@ export default function You() {
                 : ent.mode === 'live'
                   ? 'Thanks for backing Call It.'
                   : 'Unlocked on this phone (preview mode).'
-              : 'Unlimited practice, leagues, stats. Never extra points.'
+              : 'Unlimited practice, leagues, stats. Never extra Aura.'
           }
           onPress={() => router.push({ pathname: '/paywall', params: { reason: 'you' } })}
         />

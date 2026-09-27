@@ -3,25 +3,22 @@ export type Call = 'safe' | 'sure' | 'allin';
 
 export const CALLS: readonly Call[] = ['safe', 'sure', 'allin'];
 
-/** Board ids. "mixed" feeds the global board; the rest are weekly category boards. */
+/**
+ * Board ids. "mixed" feeds the global board; the rest are weekly boards, all
+ * internet culture: what people actually flex knowing about right now.
+ */
 export type BoardId =
   | 'mixed'
-  | 'video-games'
-  | 'music'
-  | 'general'
-  | 'history'
-  | 'geography'
-  | 'film'
-  | 'science'
-  | 'pop-culture'
-  | 'tech'
-  | 'anime'
-  | 'tv'
-  | 'books-art'
-  | 'sports'
-  | 'mind-games'
+  | 'memes'
+  | 'trends'
+  | 'brainrot'
+  | 'f1'
+  | 'football'
   | 'cricket'
-  | 'bollywood';
+  | 'gaming'
+  | 'pop-culture'
+  | 'anime'
+  | 'tech-ai';
 
 /** A category board: every board except "mixed". */
 export type CategoryId = Exclude<BoardId, 'mixed'>;
@@ -52,4 +49,8 @@ export type AnswerRecord = {
   points: number;
   /** Running total after this question. */
   total: number;
+  /** Generational Lock-In: the week's Aura was staked on this question. */
+  lockin?: boolean;
+  /** How much Aura was staked (0 unless locked in). */
+  stake?: number;
 };

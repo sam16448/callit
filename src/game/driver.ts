@@ -17,6 +17,8 @@ export type RecapItem = {
   msLeft: number;
   points: number;
   question: Question;
+  lockin?: boolean;
+  stake?: number;
 };
 
 export type RunPeek = { state: 'new' | 'in_progress' | 'finished'; answered: number };
@@ -27,9 +29,10 @@ export interface RunDriver {
   peek(): Promise<RunPeek>;
   /** Uses up today's attempt. Where to begin: 0, or further on when resuming. */
   start(): Promise<RunStart>;
-  teaser(index: number): Promise<TeaserInfo & { call: Call | null }>;
-  /** Locks in the call and reveals the options. shownAt is on this phone's clock. */
-  call(index: number, call: Call): Promise<Revealed & { call: Call; shownAt: number }>;
+  /** The opening words, plus the call already made (after a reconnect) and what Lock-In would stake. */
+  teaser(index: number): Promise<TeaserInfo & { call: Call | null; lockin?: boolean }>;
+  /** Locks in the call (or Generational Lock-In) and reveals the options. shownAt is on this phone's clock. */
+  call(index: number, call: Call, lockin?: boolean): Promise<Revealed & { call: Call; shownAt: number; lockin?: boolean; stake?: number }>;
   /** choice null = the timer ran out. */
   answer(index: number, choice: number | null): Promise<Outcome>;
   /** Full answers once the run is over (for the recap). */

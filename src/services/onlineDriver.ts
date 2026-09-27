@@ -35,11 +35,18 @@ export function createOnlineDriver(board: BoardId): RunDriver {
     },
     async teaser(i) {
       const t = await api.teaser(board, i);
-      return { teaser: `${t.teaser}…`, category: t.category, call: t.call };
+      return { teaser: `${t.teaser}…`, category: t.category, call: t.call, lockin: t.lockin, lockinStake: t.lockin_stake };
     },
-    async call(i, call) {
-      const r = await api.call(board, i, call);
-      return { call: r.call, prompt: r.prompt, options: r.options, shownAt: localShownAt(r.shown_at, r.server_now, Date.now()) };
+    async call(i, call, lockin = false) {
+      const r = await api.call(board, i, call, lockin);
+      return {
+        call: r.call,
+        lockin: r.lockin,
+        stake: r.stake,
+        prompt: r.prompt,
+        options: r.options,
+        shownAt: localShownAt(r.shown_at, r.server_now, Date.now()),
+      };
     },
     async answer(i, choice) {
       const r = await api.answer(board, i, choice);
@@ -51,12 +58,16 @@ export function createOnlineDriver(board: BoardId): RunDriver {
         points: r.points,
         total: r.total,
         questionId: `${board}:${i}`,
+        lockin: r.lockin,
+        stake: r.stake,
       };
     },
     async recap() {
       const rows = (await api.recap(board)) ?? [];
       return rows.map((r) => ({
         call: r.call,
+        lockin: r.lockin,
+        stake: r.stake,
         choice: r.choice,
         correct: r.correct,
         msLeft: r.ms_left,

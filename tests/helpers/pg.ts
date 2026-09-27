@@ -17,10 +17,7 @@ export const ALL_MIGRATIONS = readdirSync(DIR)
   .sort()
   .map((f) => readFileSync(new URL(f, DIR), 'utf8'));
 
-export const CATEGORY_BOARDS = [
-  'video-games', 'music', 'general', 'history', 'geography', 'film', 'science', 'pop-culture',
-  'tech', 'anime', 'tv', 'books-art', 'sports', 'mind-games', 'cricket', 'bollywood',
-];
+export const CATEGORY_BOARDS = ['memes', 'trends', 'brainrot', 'f1', 'football', 'cricket', 'gaming', 'pop-culture', 'anime', 'tech-ai'];
 
 export async function createDb(users: string[], questionsPerBoard = 20): Promise<PGlite> {
   const db = new PGlite();

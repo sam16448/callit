@@ -20,6 +20,7 @@ export function isBoardPlayable(board: BoardId): boolean {
   return ONLINE || hasRun(board, SAMPLE_QUESTIONS);
 }
 
-export function createDriver(board: BoardId, day: string): RunDriver {
-  return ONLINE ? createOnlineDriver(board) : createOfflineDriver(dailyRun(board, day, SAMPLE_QUESTIONS));
+/** @param priorWeek offline only: Aura from earlier runs this week on the board (for Lock-In). */
+export function createDriver(board: BoardId, day: string, priorWeek = 0): RunDriver {
+  return ONLINE ? createOnlineDriver(board) : createOfflineDriver(dailyRun(board, day, SAMPLE_QUESTIONS), undefined, priorWeek);
 }

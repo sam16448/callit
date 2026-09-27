@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_QUESTIONS } from '@/data/sampleQuestions';
+import { fixtureQuestions } from './helpers/fixtures';
 import { dailyRun } from '@/game/dailySet';
 import { createOfflineDriver } from '@/game/offlineDriver';
 import { runReducer, startRun } from '@/game/run';
@@ -17,7 +17,7 @@ describe('formatPoints', () => {
 
 describe('share text', () => {
   it('shows board, day, grid, score and the biggest moment without the answers', async () => {
-    const qs = dailyRun('tech', '2026-09-27', SAMPLE_QUESTIONS);
+    const qs = dailyRun('gaming', '2026-09-27', fixtureQuestions());
     let t = 0;
     const d = createOfflineDriver(qs, () => t);
     let s = startRun(qs.length);
@@ -27,14 +27,14 @@ describe('share text', () => {
     t += 1_000;
     s = runReducer(s, { type: 'ANSWERED', outcome: await d.answer(0, qs[0].answerIndex) });
     s = runReducer(s, { type: 'QUIT' });
-    const rec = recordFromRun(s, '2026-09-27', 'tech', 'done');
-    const text = shareText(rec, 'Tech');
-    expect(text).toBe(['Call It · Tech · 27 Sep', '🟪▫️▫️▫️▫️', '438 pts · AURA +1000 💥', 'Think you can call it better?'].join('\n'));
+    const rec = recordFromRun(s, '2026-09-27', 'gaming', 'done');
+    const text = shareText(rec, 'Gaming');
+    expect(text).toBe(['Call It · Gaming · 27 Sep', '🟪▫️▫️▫️▫️', '438 Aura · AURA +1000 💥', 'Think you can call it better?'].join('\n'));
     for (const opt of qs[0].options.filter((o) => o.length > 3)) expect(text).not.toContain(opt);
   });
 
   it('rebuilds the same record from a server recap', async () => {
-    const qs = dailyRun('tech', '2026-09-27', SAMPLE_QUESTIONS);
+    const qs = dailyRun('gaming', '2026-09-27', fixtureQuestions());
     let t = 0;
     const d = createOfflineDriver(qs, () => t);
     for (let i = 0; i < qs.length; i++) {
@@ -42,7 +42,7 @@ describe('share text', () => {
       t += 2_500;
       await d.answer(i, qs[i].answerIndex);
     }
-    const rec = recordFromRecap(await d.recap(), '2026-09-27', 'tech', qs.length);
+    const rec = recordFromRecap(await d.recap(), '2026-09-27', 'gaming', qs.length);
     expect(rec.answers).toHaveLength(5);
     expect(rec.grid).toBe('🟪🟦🟦🟦🟦');
     expect(rec.moments).toContain('perfect_run');

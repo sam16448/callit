@@ -36,8 +36,8 @@ describe('offline practice pool', () => {
   });
 
   it('keeps to the chosen board', () => {
-    const pool = offlinePracticePool(SAMPLE_QUESTIONS, '2026-09-27', 'tech');
+    const pool = offlinePracticePool(SAMPLE_QUESTIONS, '2026-09-27', 'f1');
     expect(pool.length).toBeGreaterThan(0);
-    expect(pool.every((q) => q.category === 'tech')).toBe(true);
+    expect(pool.every((q) => q.category === 'f1')).toBe(true);
   });
 });

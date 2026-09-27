@@ -36,7 +36,16 @@ export function recordFromRecap(
   let total = 0;
   for (const it of items) {
     total += it.points;
-    answers.push({ questionId: it.question.id, call: it.call, choice: it.choice, correct: it.correct, msLeft: it.msLeft, points: it.points, total });
+    answers.push({
+      questionId: it.question.id,
+      call: it.call,
+      choice: it.choice,
+      correct: it.correct,
+      msLeft: it.msLeft,
+      points: it.points,
+      total,
+      ...(it.lockin ? { lockin: true, stake: it.stake ?? 0 } : {}),
+    });
     moments.push(...questionMoments(answers));
   }
   moments.push(...runMoments(answers, { questionCount, dayStreak: opts.dayStreak }));
@@ -64,7 +73,7 @@ export function shortDay(day: string): string {
 
 /** Wordle-style text to paste in a group chat. No spoilers: only calls and hits. */
 export function shareText(r: Pick<RunRecord, 'day' | 'total' | 'grid' | 'biggest'>, boardName: string): string {
-  const lines = [`Call It · ${boardName} · ${shortDay(r.day)}`, r.grid, `${formatPoints(r.total)} pts`];
+  const lines = [`Call It · ${boardName} · ${shortDay(r.day)}`, r.grid, `${formatPoints(r.total)} Aura`];
   if (r.biggest) {
     const cap = DEFAULT_CAPTIONS[r.biggest];
     lines[2] += ` · ${cap.title} ${cap.emoji}`;

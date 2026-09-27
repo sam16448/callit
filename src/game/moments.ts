@@ -11,6 +11,8 @@ import { QUESTION_MS } from './scoring';
 import type { AnswerRecord } from './types';
 
 export type MomentId =
+  | 'lockin_hit'
+  | 'lockin_miss'
   | 'allin_hit'
   | 'allin_miss'
   | 'clutch'
@@ -27,6 +29,8 @@ export type MomentTier = 'big' | 'small';
 export type MomentCaption = { title: string; sub: string; emoji: string; tier: MomentTier };
 
 export const DEFAULT_CAPTIONS: Record<MomentId, MomentCaption> = {
+  lockin_hit: { title: 'GENERATIONAL', sub: 'Locked in the whole week. Cashed out. Aura doubled.', emoji: '🔒', tier: 'big' },
+  lockin_miss: { title: 'FUMBLED THE BAG', sub: 'Locked in the week and missed. Back to zero.', emoji: '📉', tier: 'big' },
   allin_hit: { title: 'AURA +1000', sub: 'All-in and right. Main character.', emoji: '💥', tier: 'big' },
   allin_miss: { title: '−1000 aura', sub: 'All-in and wrong. Cooked.', emoji: '🫠', tier: 'big' },
   clutch: { title: 'CLUTCH', sub: 'Under a second to spare.', emoji: '⏱️', tier: 'big' },
@@ -41,6 +45,8 @@ export const DEFAULT_CAPTIONS: Record<MomentId, MomentCaption> = {
 
 /** Higher number wins when several moments trigger on the same question. */
 const PRIORITY: Record<MomentId, number> = {
+  lockin_hit: 95,
+  lockin_miss: 95,
   new_number_one: 100,
   perfect_run: 90,
   allin_hit: 80,
@@ -69,7 +75,8 @@ export function questionMoments(answers: readonly AnswerRecord[]): MomentId[] {
   const last = answers[answers.length - 1];
   if (!last) return [];
   const found: MomentId[] = [];
-  if (last.call === 'allin') found.push(last.correct ? 'allin_hit' : 'allin_miss');
+  if (last.lockin) found.push(last.correct ? 'lockin_hit' : 'lockin_miss');
+  else if (last.call === 'allin') found.push(last.correct ? 'allin_hit' : 'allin_miss');
   if (last.correct) {
     if (last.msLeft < CLUTCH_MS) found.push('clutch');
     if (QUESTION_MS - last.msLeft < SPEEDRUN_MS) found.push('speedrun');

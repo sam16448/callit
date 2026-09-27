@@ -28,7 +28,7 @@ vi.mock('@/services/api', async () => {
     ...actual,
     api: {
       teaser: (board: string, i: number) => rpc('get_teaser', { p_board: board, p_q_index: i }),
-      call: (board: string, i: number, call: string) => rpc('place_call', { p_board: board, p_q_index: i, p_call: call }),
+      call: (board: string, i: number, call: string, lockin = false) => rpc('place_call', { p_board: board, p_q_index: i, p_call: call, p_lockin: lockin }),
       answer: (board: string, i: number, choice: number | null) => rpc('submit_answer', { p_board: board, p_q_index: i, p_choice: choice }),
       today: () => rpc('my_today'),
       recap: (board: string) => rpc('run_recap', { p_board: board, p_day: null }),
@@ -63,13 +63,13 @@ async function playThrough(s: RunState, d: ReturnType<typeof createOnlineDriver>
 
 describe('online driver ↔ database', () => {
   it('peeks without using up the attempt', async () => {
-    const d = createOnlineDriver('tech');
+    const d = createOnlineDriver('gaming');
     expect(await d.peek()).toEqual({ state: 'new', answered: 0 });
     expect(await d.peek()).toEqual({ state: 'new', answered: 0 });
   });
 
   it('plays a full run: teaser has no options, the server scores, the recap matches', async () => {
-    const d = createOnlineDriver('tech');
+    const d = createOnlineDriver('gaming');
     const start = await d.start();
     expect(start).toMatchObject({ status: 'ready', startIndex: 0, total: 0, questionCount: 5 });
     let s = startRun(5);
@@ -85,7 +85,7 @@ describe('online driver ↔ database', () => {
     expect(s.total).toBeGreaterThanOrEqual(5 * 296);
     expect(s.endMoments).toContain('perfect_run');
 
-    const rec = recordFromRecap(await d.recap(), 'today', 'tech', 5);
+    const rec = recordFromRecap(await d.recap(), 'today', 'gaming', 5);
     expect(rec.total).toBe(s.total);
     expect(rec.grid).toBe('🟩🟩🟩🟩🟩');
     expect(await d.peek()).toMatchObject({ state: 'finished' });
@@ -93,7 +93,7 @@ describe('online driver ↔ database', () => {
   });
 
   it('resumes a run left half-way, keeping the call already made', async () => {
-    const first = createOnlineDriver('film');
+    const first = createOnlineDriver('f1');
     await first.start();
     let s = await playThrough(startRun(5), first, 2);
     expect(s.index).toBe(2);
@@ -101,7 +101,7 @@ describe('online driver ↔ database', () => {
     await first.teaser(2);
     await first.call(2, 'allin');
 
-    const again = createOnlineDriver('film');
+    const again = createOnlineDriver('f1');
     expect(await again.peek()).toEqual({ state: 'in_progress', answered: 2 });
     const start = await again.start();
     expect(start).toMatchObject({ status: 'ready', startIndex: 2 });
@@ -122,21 +122,38 @@ describe('online driver ↔ database', () => {
   });
 
   it('turns server errors into friendly ones', async () => {
-    const d = createOnlineDriver('tech');
+    const d = createOnlineDriver('gaming');
     await expect(d.teaser(0)).rejects.toMatchObject({ code: 'already_played' });
   });
 
   it('fills the weekly board and the near-you view', async () => {
     currentUser = FRIEND;
-    const d = createOnlineDriver('tech');
+    const d = createOnlineDriver('gaming');
     await d.start();
     await playThrough(startRun(5), d, 5, 1); // all wrong on Sure: −750
     const { api } = await import('@/services/api');
-    const rows = (await api.board('tech')) as { nickname: string; is_me: boolean; total: number }[];
+    const rows = (await api.board('gaming')) as { nickname: string; is_me: boolean; total: number }[];
     expect(rows.map((r) => r.nickname)).toEqual(['sam', 'riya']);
     expect(rows[1]).toMatchObject({ is_me: true });
     expect(Number(rows[1].total)).toBe(-750);
     expect(nearYou(rows)).toHaveLength(2);
+    currentUser = ME;
+  });
+
+  it('plays a Generational Lock-In through the real server', async () => {
+    currentUser = FRIEND;
+    const d = createOnlineDriver('anime');
+    await d.start();
+    let s = await playThrough(startRun(5), d, 1); // +~300 on Sure
+    const t = await d.teaser(1);
+    expect(t.lockinStake).toBe(s.total);
+    const r = await d.call(1, 'safe', true);
+    expect(r).toMatchObject({ call: 'allin', lockin: true, stake: s.total });
+    s = runReducer(runReducer(s, { type: 'TEASER', teaser: t }), { type: 'CALLED', call: r.call, revealed: r, shownAt: r.shownAt, lockin: r.lockin, stake: r.stake });
+    s = runReducer(s, { type: 'ANSWERED', outcome: await d.answer(1, 0) });
+    expect(s.spotlight).toBe('lockin_hit');
+    expect(s.answers[1]).toMatchObject({ lockin: true, correct: true });
+    expect((await d.teaser(2)).lockinStake).toBeNull();
     currentUser = ME;
   });
 

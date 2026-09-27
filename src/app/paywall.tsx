@@ -128,7 +128,7 @@ export default function Paywall() {
 
       <View style={styles.promise}>
         <Ionicons name="scale-outline" size={18} color={C.accent} />
-        <Text style={styles.promiseText}>Never extra points. Ranked runs are free and identical for everyone.</Text>
+        <Text style={styles.promiseText}>Never extra Aura. Ranked runs are free and identical for everyone.</Text>
       </View>
 
       <View style={{ gap: S.sm, marginTop: S.lg }}>

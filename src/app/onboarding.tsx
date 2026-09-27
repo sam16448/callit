@@ -38,7 +38,7 @@ export default function Onboarding() {
         <Card style={styles.howCard}>
           <View style={styles.howRow}>
             <CallTag call="safe" />
-            <Text style={styles.howText}>Can&apos;t lose points</Text>
+            <Text style={styles.howText}>Can&apos;t lose Aura</Text>
           </View>
           <View style={styles.howRow}>
             <CallTag call="sure" />

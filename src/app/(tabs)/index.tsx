@@ -125,7 +125,7 @@ export default function Play() {
         {mixedRun ? (
           <View style={styles.done}>
             <View style={{ flex: 1 }}>
-              <Text style={[T.label, { color: C.muted }]}>{mixedRun.state === 'done' ? 'Your score' : 'Paused at'}</Text>
+              <Text style={[T.label, { color: C.muted }]}>{mixedRun.state === 'done' ? 'Your Aura' : 'Paused at'}</Text>
               <Text style={styles.doneScore}>{formatPoints(mixedRun.total)}</Text>
               {mixedRun.grid ? <Text style={styles.grid}>{mixedRun.grid}</Text> : null}
             </View>

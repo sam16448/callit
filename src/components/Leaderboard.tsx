@@ -77,7 +77,7 @@ export function Leaderboard({ leagueId, emptyHint }: { leagueId?: string; emptyH
         <ActivityIndicator color={C.accent} style={{ marginTop: S.xxl }} />
       ) : rows.length === 0 ? (
         <Card style={{ marginTop: S.lg }}>
-          <Text style={[T.h2, { color: C.text }]}>No scores yet this week</Text>
+          <Text style={[T.h2, { color: C.text }]}>No Aura on the board yet this week</Text>
           <Text style={[T.body, { color: C.muted, marginTop: S.sm }]}>
             {emptyHint ?? `Play today's ${b.id === 'mixed' ? 'Mixed' : b.name} run and take the top spot.`}
           </Text>
