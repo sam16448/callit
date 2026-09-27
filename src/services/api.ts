@@ -93,6 +93,7 @@ export type RecapRow = {
   category: CategoryId;
 };
 export type BoardRow = { rank: number; user_id: string; nickname: string; avatar: string; is_pro: boolean; total: number; runs: number; is_me: boolean };
+export type BoardStatusRow = { board: BoardId; questions: number; playable: boolean };
 export type LeagueRow = { id: string; code: string; name: string; is_owner: boolean; members: number };
 
 export const api = {
@@ -103,6 +104,7 @@ export const api = {
   recap: (board: BoardId, day?: string) => rpc<RecapRow[] | null>('run_recap', { p_board: board, p_day: day ?? null }),
   board: (board: BoardId, leagueId?: string) =>
     rpc<BoardRow[]>('weekly_board', { p_board: board, p_week: null, p_league_id: leagueId ?? null, p_limit: 100 }),
+  boardStatus: () => rpc<BoardStatusRow[]>('board_status'),
   myLeagues: () => rpc<LeagueRow[]>('my_leagues'),
   createLeague: (name: string) => rpc<{ id: string; code: string; name: string }>('create_league', { p_name: name }),
   joinLeague: (code: string) => rpc<{ id: string; code: string; name: string }>('join_league', { p_code: code }),

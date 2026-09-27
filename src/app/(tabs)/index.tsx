@@ -6,7 +6,7 @@ import { Button, Card, Pill, Screen, SectionLabel, tapLight } from '@/components
 import { BOARDS, boardById, type Board } from '@/game/boards';
 import { formatCountdown, msUntilNextRun, utcDay } from '@/game/time';
 import { formatPoints } from '@/lib/format';
-import { api, type TodayRow } from '@/services/api';
+import { api, type BoardStatusRow, type TodayRow } from '@/services/api';
 import { isBoardPlayable } from '@/services/questions';
 import { ONLINE } from '@/services/supabase';
 import { useProfile } from '@/state/profile';
@@ -27,9 +27,13 @@ function openRun(board: Board) {
   router.push({ pathname: '/run/[board]', params: { board: board.id } });
 }
 
-/** Today's runs on the server (online), so runs from before a reinstall still show. */
+/**
+ * Online: today's runs on the server (so runs from before a reinstall still show)
+ * and which boards have questions yet (Cricket and Bollywood show "Soon" until theirs are added).
+ */
 function useServerToday() {
   const [rows, setRows] = useState<TodayRow[]>([]);
+  const [boards, setBoards] = useState<BoardStatusRow[] | null>(null);
   useFocusEffect(
     useCallback(() => {
       if (!ONLINE) return;
@@ -38,18 +42,25 @@ function useServerToday() {
         .today()
         .then((r) => live && setRows(r))
         .catch(() => {});
+      api
+        .boardStatus()
+        .then((r) => live && setBoards(r))
+        .catch(() => {});
       return () => {
         live = false;
       };
     }, []),
   );
-  return rows;
+  return { rows, boards };
 }
 
 export default function Play() {
   const { profile } = useProfile();
   const { get } = useRuns();
-  const server = useServerToday();
+  const { rows: server, boards: serverBoards } = useServerToday();
+  /** Offline: bundled questions decide. Online: the server's board status (open until it has loaded). */
+  const playable = (id: Board['id']) =>
+    ONLINE ? (serverBoards?.find((b) => b.board === id)?.playable ?? serverBoards === null) : isBoardPlayable(id);
   const now = useNow(30_000);
   const day = utcDay(now);
   const mixed = boardById('mixed')!;
@@ -108,23 +119,23 @@ export default function Play() {
       <SectionLabel right={<Text style={styles.small}>5 questions · weekly boards</Text>}>Category runs</SectionLabel>
       <View style={styles.tiles}>
         {categories.map((b) => {
-          const playable = isBoardPlayable(b.id);
+          const open = playable(b.id);
           const rec = status(b.id);
           return (
             <Pressable
               key={b.id}
-              disabled={!playable}
+              disabled={!open}
               onPress={() => openRun(b)}
               accessibilityRole="button"
               accessibilityLabel={`${b.name} run`}
-              style={({ pressed }) => [styles.tile, !playable && { opacity: 0.4 }, pressed && { opacity: 0.8 }]}
+              style={({ pressed }) => [styles.tile, !open && { opacity: 0.4 }, pressed && { opacity: 0.8 }]}
             >
               <Text style={styles.tileEmoji}>{b.emoji}</Text>
               <Text style={styles.tileName} numberOfLines={1}>
                 {b.name}
               </Text>
               <Text style={[styles.tileMeta, rec && { color: C.accent }]} numberOfLines={1}>
-                {rec ? (rec.state === 'done' ? formatPoints(rec.total) : 'Continue') : playable ? 'Play' : 'Soon'}
+                {rec ? (rec.state === 'done' ? formatPoints(rec.total) : 'Continue') : open ? 'Play' : 'Soon'}
               </Text>
             </Pressable>
           );

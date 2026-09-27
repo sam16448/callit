@@ -75,6 +75,9 @@ describe('teaserFor (automatic)', () => {
     expect(teaserFor({ prompt: 'Name this one?' })).toBe('Name this…');
     const long = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen';
     expect(teaserFor({ prompt: long })).toBe('one two three four five six seven eight…');
+    // Stops before an open quote instead of cutting a name in half.
+    expect(teaserFor({ prompt: 'Who voices the character "Vernon Cherry" in "Red Dead Redemption"?' })).toBe('Who voices the character…');
+    expect(teaserFor({ prompt: 'The song "Naatu Naatu" is from which film?' })).toBe('The song "Naatu Naatu"…');
   });
 });
 

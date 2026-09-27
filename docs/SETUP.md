@@ -14,8 +14,10 @@ All commands are for **Windows PowerShell**, run inside the `callit` folder.
 ## 2. Create the database
 
 1. In the project, open **SQL Editor** → **New query**.
-2. Open `supabase/migrations/20260927000000_init.sql` from this repo, copy **all** of it, paste it in and click **Run**.
-3. You should see "Success. No rows returned".
+2. Run each file in `supabase/migrations/` **in order** (oldest first): open it, copy all of it, paste it in and click **Run**.
+3. You should see "Success. No rows returned" each time.
+
+Always run the whole set in order: the first file resets function permissions, so running it alone afterwards would lock out the later functions.
 
 ## 3. Allow anonymous sign-in
 
@@ -51,6 +53,7 @@ npm run import:questions
 - It downloads Open Trivia DB (about 10 minutes, one request every 5 seconds) and prints how many questions each board got.
 - Then it asks for the **Secret key**: **Project Settings** → **API Keys** → **Secret keys** → reveal and copy (`sb_secret_…`). Paste it and press Enter. It's used for this upload only and never saved.
 - If anything fails, just run it again: the download is cached and re-uploading doesn't create duplicates.
+- Alternative without a local download: `supabase/functions/import-questions/index.ts` does the same import inside Supabase as an Edge Function, in resumable batches. That's how the live project was filled.
 
 ## 6. Play
 

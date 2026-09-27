@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "import:questions": "tsx scripts/import-questions.ts"
+    "import:questions": "tsx scripts/import-questions.ts",
+    "build:import-fn": "esbuild supabase/functions/import-questions/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=supabase/functions/import-questions/dist/index.js"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

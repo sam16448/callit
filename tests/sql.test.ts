@@ -7,7 +7,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { scoreAnswer } from '@/game/scoring';
 import type { Call } from '@/game/types';
-import { MIGRATION, createDb } from './helpers/pg';
+import { ALL_MIGRATIONS, createDb } from './helpers/pg';
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -61,8 +61,8 @@ async function playQuestion(uid: string, board: string, i: number, call: Call, o
 
 beforeAll(async () => {
   db = await createDb([A, B, C]);
-  // Running the migration twice must be safe (people re-run it after edits).
-  await db.exec(MIGRATION);
+  // Running the migrations twice must be safe (people re-run them after edits).
+  for (const m of ALL_MIGRATIONS) await db.exec(m);
 }, 60_000);
 
 describe('score_answer (SQL) matches src/game/scoring.ts', () => {
@@ -207,6 +207,18 @@ describe('daily sets', () => {
     }
     expect(new Set(sets.slice(0, 4).flat()).size).toBe(20);
     expect(sets[4]).toHaveLength(5);
+  });
+
+  it('reports which boards are playable', async () => {
+    const rows = await asUser<{ board: string; questions: number; playable: boolean }>(A, 'select * from public.board_status()');
+    const by = Object.fromEntries(rows.map((r) => [r.board, r]));
+    expect(rows).toHaveLength(17);
+    expect(by.history.playable).toBe(true);
+    expect(by.mixed.playable).toBe(true);
+    await db.exec(`update public.questions set active = false where board = 'cricket'`);
+    const after = await asUser<{ board: string; playable: boolean }>(A, 'select * from public.board_status()');
+    expect(after.find((r) => r.board === 'cricket')?.playable).toBe(false);
+    await db.exec(`update public.questions set active = true where board = 'cricket'`);
   });
 
   it('rejects unknown boards', async () => {

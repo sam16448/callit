@@ -45,3 +45,4 @@ yarn-error.*
 
 # question import cache (re-downloadable from opentdb.com)
 data/questions/opentdb-raw.json
+supabase/functions/*/dist/

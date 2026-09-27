@@ -16,9 +16,14 @@ export function teaserFor(q: Pick<Question, 'prompt' | 'teaser'>): string {
   n = Math.max(MIN_WORDS, Math.min(MAX_WORDS, n));
   n = Math.min(n, words.length - 1);
   if (n <= 0) return '…';
-  const text = words
+  let text = words
     .slice(0, n)
     .join(' ')
     .replace(/[,;:?.!]+$/, '');
+  // Never stop inside a quote ("Vernon…): cut back to before the open quote.
+  if ((text.match(/"/g) ?? []).length % 2 === 1) {
+    const cut = text.replace(/\s*"[^"]*$/, '').trim();
+    if (cut) text = cut;
+  }
   return `${text}…`;
 }

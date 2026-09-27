@@ -4,9 +4,18 @@
  * Supabase's `auth` schema stubbed: auth.uid() returns the user we set per call.
  */
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
-export const MIGRATION = readFileSync(new URL('../../supabase/migrations/20260927000000_init.sql', import.meta.url), 'utf8');
+const DIR = new URL('../../supabase/migrations/', import.meta.url);
+
+/** The first migration (tables and functions). */
+export const MIGRATION = readFileSync(new URL('20260927000000_init.sql', DIR), 'utf8');
+
+/** Every migration, in order, exactly as applied to the live project. */
+export const ALL_MIGRATIONS = readdirSync(DIR)
+  .filter((f) => f.endsWith('.sql'))
+  .sort()
+  .map((f) => readFileSync(new URL(f, DIR), 'utf8'));
 
 export const CATEGORY_BOARDS = [
   'video-games', 'music', 'general', 'history', 'geography', 'film', 'science', 'pop-culture',
@@ -25,7 +34,7 @@ export async function createDb(users: string[], questionsPerBoard = 20): Promise
     grant usage on schema public to anon, authenticated;
     grant execute on function auth.uid() to anon, authenticated;
   `);
-  await db.exec(MIGRATION);
+  for (const m of ALL_MIGRATIONS) await db.exec(m);
   if (users.length) await db.query(`insert into auth.users (id) select unnest($1::uuid[])`, [users]);
   const values: string[] = [];
   for (const b of CATEGORY_BOARDS) {
