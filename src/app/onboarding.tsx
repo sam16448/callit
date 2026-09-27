@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput,
 import { CallTag } from '@/components/CallTag';
 import { Button, Card, Screen, SectionLabel } from '@/components/ui';
 import { AVATARS, NICKNAME_MAX, cleanNickname, nicknameError } from '@/lib/nickname';
+import { takePendingInvite } from '@/lib/pendingInvite';
 import { useProfile } from '@/state/profile';
 import { C, F, R, S, T } from '@/theme';
 
@@ -19,7 +20,10 @@ export default function Onboarding() {
     setTouched(true);
     if (error) return;
     create(cleanNickname(name), avatar);
-    router.replace('/');
+    // Came from an invite link: go on to join that league.
+    const invite = takePendingInvite();
+    if (invite) router.replace({ pathname: '/join/[code]', params: { code: invite } });
+    else router.replace('/');
   };
 
   return (

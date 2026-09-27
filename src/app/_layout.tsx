@@ -55,6 +55,8 @@ function AppStack({ fontsReady }: { fontsReady: boolean }) {
       <Stack.Screen name="run/[board]" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
       <Stack.Screen name="how-to-play" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
       <Stack.Screen name="practice" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+      <Stack.Screen name="league/[id]" />
+      <Stack.Screen name="join/[code]" options={{ animation: 'fade' }} />
       <Stack.Screen name="paywall" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
     </Stack>
   );
