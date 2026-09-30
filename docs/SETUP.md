@@ -1,7 +1,7 @@
 # Setting up the online version
 
 Without any keys, Call It runs as an **offline demo** on 30 bundled questions.
-These steps switch on the real thing: all 16 boards, server scoring and live leaderboards.
+These steps switch on the real thing: all 12 boards (Mixed + 11), server scoring and live leaderboards.
 It takes about 20 minutes, most of it waiting for the question download.
 
 All commands are for **Windows PowerShell**, run inside the `callit` folder.

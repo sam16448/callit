@@ -24,6 +24,8 @@ export function toApiError(raw: { message?: string } | null | undefined): ApiErr
   if (/lock-in already used/i.test(m)) return new ApiError('You already used your Lock-In this run.', 'other');
   if (/practice limit reached/i.test(m)) return new ApiError("That's today's free practice.", 'practice_limit');
   if (/not enough questions/i.test(m)) return new ApiError("This board's questions aren't loaded yet.", 'no_questions');
+  if (/start at question 0|make your call first|answer the current question first|not the current question/i.test(m))
+    return new ApiError("Today's run closed at 00:00 UTC. Head back and start today's new run.", 'other');
   if (/fetch|network|timeout|Failed to/i.test(m)) return new ApiError('No connection. Check your internet and try again.', 'network');
   return new ApiError(m, 'other');
 }

@@ -87,11 +87,12 @@ export async function buy(pkg: PurchasesPackage): Promise<PurchaseOutcome> {
   }
 }
 
-export async function restore(): Promise<CustomerInfo | undefined> {
+/** Restores purchases; 'error' when the store couldn't be reached (not the same as "nothing to restore"). */
+export async function restore(): Promise<CustomerInfo | 'error'> {
   try {
     return await Purchases.restorePurchases();
   } catch {
-    return undefined;
+    return 'error';
   }
 }
 

@@ -16,7 +16,7 @@ import {
   type PlanKind,
   type PurchaseMode,
 } from '@/services/purchases';
-import { ONLINE, ensureSession } from '@/services/supabase';
+import { ONLINE, ensureSession, supabase } from '@/services/supabase';
 
 const LOCAL_PRO_KEY = 'callit.localPro.v1';
 
@@ -36,8 +36,9 @@ type EntitlementsState = {
   /** ISO date the subscription renews or ends (live mode only). */
   renews: string | null;
   plans: PlanOption[];
-  purchase: (plan: PlanOption) => Promise<'unlocked' | 'cancelled' | 'error'>;
-  restorePurchases: () => Promise<'restored' | 'nothing' | 'unavailable'>;
+  /** 'pending': the store took the payment but Pro isn't active yet (restore fixes it). */
+  purchase: (plan: PlanOption) => Promise<'unlocked' | 'pending' | 'cancelled' | 'error'>;
+  restorePurchases: () => Promise<'restored' | 'nothing' | 'unavailable' | 'failed'>;
   /** Preview/demo only: turn local Pro off again (for trying the paywall twice). */
   resetPreview: () => void;
 };
@@ -66,13 +67,22 @@ export function EntitlementsProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setReady(true));
     // Same id as the Supabase player, so the RevenueCat webhook can mark them Pro on the server.
-    if (ONLINE) {
+    let unsub: (() => void) | undefined;
+    if (ONLINE && supabase) {
       ensureSession()
         .then((id) => linkUser(id))
         .then((ci) => ci && setInfo(ci))
         .catch(() => {});
+      // A new player (after "Start over") gets their own RevenueCat customer.
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) linkUser(session.user.id).then((ci) => ci && setInfo(ci));
+      });
+      unsub = () => data.subscription.unsubscribe();
     }
-    return off;
+    return () => {
+      off();
+      unsub?.();
+    };
   }, []);
 
   const pro = PURCHASE_MODE === 'live' ? isPro(info) : localPro;
@@ -101,13 +111,13 @@ export function EntitlementsProvider({ children }: { children: ReactNode }) {
     const result = await buy(plan.pkg);
     if (!result.ok) return result.cancelled ? 'cancelled' : 'error';
     setInfo(result.info);
-    return isPro(result.info) ? 'unlocked' : 'error';
+    return isPro(result.info) ? 'unlocked' : 'pending';
   }, []);
 
   const restorePurchases = useCallback<EntitlementsState['restorePurchases']>(async () => {
     if (PURCHASE_MODE !== 'live') return 'unavailable';
     const ci = await restore();
-    if (!ci) return 'nothing';
+    if (ci === 'error') return 'failed';
     setInfo(ci);
     return isPro(ci) ? 'restored' : 'nothing';
   }, []);

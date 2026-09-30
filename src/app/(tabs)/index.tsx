@@ -37,7 +37,7 @@ function openRun(board: Board) {
 
 /**
  * Online: today's runs on the server (so runs from before a reinstall still show)
- * and which boards have questions yet (Cricket and Bollywood show "Soon" until theirs are added).
+ * and which boards have enough questions (a board shows "Soon" until it does).
  */
 function useServerToday() {
   const [rows, setRows] = useState<TodayRow[]>([]);
@@ -176,7 +176,7 @@ export default function Play() {
           </View>
         ) : (
           <View style={{ marginTop: S.lg }}>
-            <Button title="PLAY" icon="flash" onPress={() => openRun(mixed)} />
+            <Button title={playable('mixed') ? 'PLAY' : 'Opening soon'} icon="flash" disabled={!playable('mixed')} onPress={() => openRun(mixed)} />
           </View>
         )}
       </View>
@@ -206,7 +206,8 @@ export default function Play() {
               disabled={!open}
               onPress={() => openRun(b)}
               accessibilityRole="button"
-              accessibilityLabel={`${b.name} run`}
+              accessibilityLabel={`${b.name}: ${rec ? (rec.state === 'done' ? `done, ${formatPoints(rec.total)} Aura` : 'continue') : open ? 'play' : 'soon'}`}
+              accessibilityState={{ disabled: !open }}
               style={({ pressed }) => [styles.tile, { borderColor: alpha(b.color, 0.35), borderBottomColor: alpha(b.color, 0.7) }, !open && { opacity: 0.4 }, pressed && styles.tilePressed]}
             >
               <LinearGradient colors={[alpha(b.color, 0.22), alpha(b.color, 0.04)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />

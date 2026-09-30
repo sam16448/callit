@@ -369,7 +369,7 @@ function LiveRun({
     const record = finalRecord ?? recordFromRun(run, day, board.id, 'done');
     body = (
       <>
-        {run.answers.length < run.questionCount && driver.mode === 'online' ? (
+        {run.index < run.questionCount && driver.mode === 'online' ? (
           <Text style={styles.already}>Run paused. Come back before 00:00 UTC to finish it.</Text>
         ) : null}
         <RunSummary record={record} boardName={board.name} cardRef={cardRef} />

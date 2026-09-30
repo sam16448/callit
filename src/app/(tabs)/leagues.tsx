@@ -33,7 +33,11 @@ function LiveLeagues() {
       let live = true;
       api
         .myLeagues()
-        .then((r) => live && setLeagues(r))
+        .then((r) => {
+          if (!live) return;
+          setLeagues(r);
+          setLoadError(null);
+        })
         .catch((e: Error) => live && setLoadError(e.message));
       return () => {
         live = false;

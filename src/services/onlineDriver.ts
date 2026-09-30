@@ -21,16 +21,20 @@ export function createOnlineDriver(board: BoardId): RunDriver {
       return { state: row.finished ? 'finished' : 'in_progress', answered: row.answered };
     },
     async start() {
-      const today = await api.today();
-      const row = today.find((r) => r.board === board);
-      if (row?.finished) return { status: 'finished', questionCount: row.question_count };
-      try {
-        const t = await api.teaser(board, row?.answered ?? 0);
-        return { status: 'ready', startIndex: t.q_index, total: t.total, questionCount: t.question_count };
-      } catch (e) {
-        // Everything left was already timed out on the server.
-        if (e instanceof ApiError && e.code === 'already_played') return { status: 'finished', questionCount: row?.question_count ?? 0 };
-        throw e;
+      for (let attempt = 0; ; attempt++) {
+        const today = await api.today();
+        const row = today.find((r) => r.board === board);
+        if (row?.finished) return { status: 'finished', questionCount: row.question_count };
+        try {
+          const t = await api.teaser(board, row?.answered ?? 0);
+          return { status: 'ready', startIndex: t.q_index, total: t.total, questionCount: t.question_count };
+        } catch (e) {
+          // Everything left was already timed out on the server.
+          if (e instanceof ApiError && e.code === 'already_played') return { status: 'finished', questionCount: row?.question_count ?? 0 };
+          // A question timed out between the two calls: ask again once.
+          if (e instanceof ApiError && e.code === 'already_answered' && attempt === 0) continue;
+          throw e;
+        }
       }
     },
     async teaser(i) {

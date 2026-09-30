@@ -1,4 +1,4 @@
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Avatar } from '@/components/Avatar';
 import { Button, Card, PageHeader, Pill, Row, Screen, SectionLabel } from '@/components/ui';
@@ -91,7 +91,16 @@ export default function You() {
       </Card>
 
       <View style={{ marginTop: S.xl }}>
-        <Button title="Start over (clears this phone)" variant="ghost" onPress={reset} />
+        <Button
+          title="Start over (clears this phone)"
+          variant="ghost"
+          onPress={() =>
+            Alert.alert('Start over?', 'This deletes your nickname, runs, streak and league spots on this phone. It can’t be undone.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Start over', style: 'destructive', onPress: reset },
+            ])
+          }
+        />
       </View>
     </Screen>
   );

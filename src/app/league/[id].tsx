@@ -52,7 +52,7 @@ export default function LeagueScreen() {
 
   return (
     <Screen>
-      <BackBar onBack={leave} title="League" right={<Ionicons name="exit-outline" size={22} color={C.muted} onPress={confirmLeave} accessibilityLabel="Leave league" />} />
+      <BackBar onBack={leave} title="League" right={<Ionicons name="exit-outline" size={22} color={C.muted} onPress={confirmLeave} accessibilityRole="button" accessibilityLabel="Leave league" hitSlop={12} />} />
       <Text style={[T.h1, { color: C.text }]}>{title}</Text>
 
       {code ? (

@@ -2,7 +2,7 @@
  * Where a run's questions come from.
  *
  * Online (Supabase keys in .env): the server picks the day's questions and
- * scores every answer; all 16 boards are open.
+ * scores every answer.
  * Offline (no keys): the 33 bundled sample questions (3 per board, so
  * category runs are 3 questions), picked per UTC day and scored on the phone
  * with the same rules. Screens only use this file.

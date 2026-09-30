@@ -79,7 +79,8 @@ export default function Paywall() {
     const result = await ent.purchase(selected);
     setBusy(null);
     if (result === 'unlocked') close();
-    else if (result === 'error') Alert.alert('Purchase not completed', 'Nothing was charged. Please try again.');
+    else if (result === 'pending') Alert.alert('Almost there', 'The store took your payment but Pro isn\'t active yet. Tap Restore purchases in a moment.');
+    else if (result === 'error') Alert.alert('Purchase not completed', 'Something went wrong with the store. Please try again.');
   };
 
   const onRestore = async () => {
@@ -89,8 +90,12 @@ export default function Paywall() {
     if (r === 'restored') close();
     else
       Alert.alert(
-        r === 'unavailable' ? 'Restore needs the installed app' : 'Nothing to restore',
-        r === 'unavailable' ? 'Restoring works in the installed app with a store account.' : 'No active Call It Pro subscription was found for this account.',
+        r === 'unavailable' ? 'Restore needs the installed app' : r === 'failed' ? "Couldn't reach the store" : 'Nothing to restore',
+        r === 'unavailable'
+          ? 'Restoring works in the installed app with a store account.'
+          : r === 'failed'
+            ? 'Check your connection and try again.'
+            : 'No active Call It Pro subscription was found for this account.',
       );
   };
 
@@ -99,7 +104,7 @@ export default function Paywall() {
       footer={
         <View style={{ gap: S.sm }}>
           <Button
-            title={selected ? `Start Pro · ${selected.priceString}/${selected.kind === 'annual' ? 'yr' : 'mo'}` : 'Plans unavailable'}
+            title={selected ? `Start Pro · ${selected.priceString}/${selected.kind === 'annual' ? 'yr' : 'mo'}` : ent.ready ? 'Plans unavailable' : 'Loading plans…'}
             icon="flash"
             onPress={onBuy}
             loading={busy === 'buy'}
@@ -135,7 +140,7 @@ export default function Paywall() {
         {ent.plans.map((p) => (
           <PlanCard key={p.id} plan={p} selected={p.id === selected?.id} saving={saving} onPress={() => setSelectedId(p.id)} />
         ))}
-        {ent.plans.length === 0 ? <Text style={[T.small, { color: C.muted }]}>Plans couldn&apos;t load. Check your connection and try again.</Text> : null}
+        {ent.plans.length === 0 && ent.ready ? <Text style={[T.small, { color: C.muted }]}>Plans couldn&apos;t load. Check your connection and try again.</Text> : null}
       </View>
 
       <View style={styles.links}>

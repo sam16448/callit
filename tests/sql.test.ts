@@ -118,6 +118,16 @@ describe('a ranked run', () => {
     expect(res.points).toBeLessThanOrEqual(420);
   });
 
+  it('resumes at the right question after leaving mid-question', async () => {
+    await rpc(B, 'get_teaser', ['anime', 0]);
+    await rpc(B, 'place_call', ['anime', 0, 'sure']);
+    await shownAgo(B, 'anime', 0, 20_000); // left the app for 20 s while the question showed
+    const today = await asUser<{ board: string; answered: number }>(B, 'select * from public.my_today()');
+    expect(today.find((r) => r.board === 'anime')?.answered).toBe(1); // timed out, not stuck
+    const t = await rpc<{ q_index: number }>(B, 'get_teaser', ['anime', 1]);
+    expect(t.q_index).toBe(1);
+  });
+
   it('allows one answer per question and no skipping ahead', async () => {
     await expectError(rpc(A, 'submit_answer', ['football', 0, 1]), /already answered/);
     await expectError(rpc(A, 'get_teaser', ['football', 0]), /already answered/);
