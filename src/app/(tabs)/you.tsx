@@ -65,6 +65,23 @@ export default function You() {
         ) : null}
       </Card>
 
+      <SectionLabel>You</SectionLabel>
+      <Card style={{ paddingVertical: S.sm }}>
+        <Row
+          leading={<Text style={{ fontSize: 20 }}>📊</Text>}
+          title="Your stats"
+          sub="Accuracy, how your calls pay off, best boards"
+          right={ent.pro ? undefined : <Pill text="PRO" color={C.accentInk} filled={C.accent} />}
+          onPress={() => router.push('/stats')}
+        />
+        <Row
+          leading={<Text style={{ fontSize: 20 }}>🛡️</Text>}
+          title="Streak shield"
+          sub={ent.pro ? 'On: one missed day a week won’t reset your streak' : 'Pro covers one missed day a week'}
+          onPress={ent.pro ? undefined : () => router.push({ pathname: '/paywall', params: { reason: 'streak_shield' } })}
+        />
+      </Card>
+
       <SectionLabel>Settings</SectionLabel>
       <Card style={{ paddingVertical: S.sm }}>
         <Row

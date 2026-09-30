@@ -7,7 +7,7 @@ import { Avatar } from '@/components/Avatar';
 import { CrewIdle } from '@/components/brainrot/CrewDancer';
 import { Button, Pill, Screen, SectionLabel, tapLight } from '@/components/ui';
 import { BOARDS, boardById, type Board } from '@/game/boards';
-import { formatCountdown, msUntilNextRun, utcDay } from '@/game/time';
+import { formatCountdown, msUntilNextRun, previousDay, utcDay } from '@/game/time';
 import { characterIdOf } from '@/lib/avatar';
 import { formatPoints } from '@/lib/format';
 import { lifetimeAura, rankFor } from '@/lib/rank';
@@ -17,7 +17,7 @@ import { practiceServedToday } from '@/services/practice';
 import { isBoardPlayable } from '@/services/questions';
 import { ONLINE } from '@/services/supabase';
 import { useEntitlements } from '@/state/entitlements';
-import { useProfile } from '@/state/profile';
+import { shieldReady, useProfile } from '@/state/profile';
 import { useRuns } from '@/state/runs';
 import { C, F, R, S, T, alpha } from '@/theme';
 
@@ -112,6 +112,11 @@ export default function Play() {
   const crew = characterIdOf(profile?.avatar) ?? 'samosa';
   const playedToday = categories.filter((b) => status(b.id)?.state === 'done').length + (mixedRun?.state === 'done' ? 1 : 0);
   const boardCount = categories.length + 1;
+  // The streak as it stands today: it only breaks once a day is missed (Pro's shield covers one a week).
+  const shield = shieldReady(profile, pro, day);
+  const last = profile?.lastPlayedDay ?? null;
+  const liveStreak =
+    last && (last === day || last === previousDay(day) || (shield && last === previousDay(previousDay(day)))) ? (profile?.dayStreak ?? 0) : 0;
 
   return (
     <Screen tab>
@@ -136,11 +141,12 @@ export default function Play() {
         </View>
         <View style={[styles.stat, { borderColor: 'rgba(255,201,64,0.4)' }]}>
           <Text style={styles.statIcon}>🔥</Text>
-          <Text style={[styles.statText, { color: C.gold }]}>{profile?.dayStreak ?? 0}</Text>
+          <Text style={[styles.statText, { color: C.gold }]}>{liveStreak}</Text>
+          {shield ? <Text style={styles.statIcon}>🛡️</Text> : null}
         </View>
       </View>
 
-      <Pressable onPress={() => router.push('/how-to-play')} accessibilityRole="button" accessibilityLabel="Your Aura rank" style={styles.rankCard}>
+      <Pressable onPress={() => router.push('/stats')} accessibilityRole="button" accessibilityLabel="Your Aura rank and stats" style={styles.rankCard}>
         <View style={styles.rankRow}>
           <Text style={styles.rankLabel}>
             {rank.rank.emoji} {rank.rank.title}

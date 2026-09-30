@@ -17,14 +17,15 @@ import type { RunDriver } from '@/game/driver';
 import type { MomentId } from '@/game/moments';
 import { runReducer, startRun, type RunAction, type RunState } from '@/game/run';
 import { QUESTION_MS, clampMsLeft } from '@/game/scoring';
-import { nextDayStreak, utcDay, weekStart } from '@/game/time';
+import { shieldedStreak, utcDay, weekStart } from '@/game/time';
 import type { Call } from '@/game/types';
 import { formatPoints } from '@/lib/format';
 import { recordFromRecap, recordFromRun } from '@/lib/share';
 import { ApiError } from '@/services/api';
 import { createDriver, isBoardPlayable, plannedRunLength } from '@/services/questions';
 import { shareRun } from '@/services/shareCard';
-import { useProfile } from '@/state/profile';
+import { useEntitlements } from '@/state/entitlements';
+import { shieldReady, useProfile } from '@/state/profile';
 import { useRuns, type RunRecord } from '@/state/runs';
 import { CALL_COLOR, C, F, R, S, T, alpha } from '@/theme';
 
@@ -59,6 +60,8 @@ export default function RunScreen() {
 
 function Run({ board }: { board: Board }) {
   const { profile, recordPlay } = useProfile();
+  const { pro } = useEntitlements();
+  const finish = useCallback((d: string) => recordPlay(d, pro), [recordPlay, pro]);
   const { get, save, runs } = useRuns();
   const [day] = useState(() => utcDay());
   // Offline, Lock-In stakes this week's earlier runs on the board too (online the server knows).
@@ -73,7 +76,7 @@ function Run({ board }: { board: Board }) {
   const [finished, setFinished] = useState<RunRecord | null>(null);
 
   const recap = finished ?? (savedAtOpen && (savedAtOpen.status === 'done' || driver.mode === 'offline') ? savedAtOpen : null);
-  if (recap) return <Recap board={board} saved={recap} onSave={save} onFinish={recordPlay} />;
+  if (recap) return <Recap board={board} saved={recap} onSave={save} onFinish={finish} />;
 
   return (
     <LiveRun
@@ -81,9 +84,13 @@ function Run({ board }: { board: Board }) {
       day={day}
       driver={driver}
       chill={Boolean(profile?.chill)}
-      nextStreak={profile && profile.lastPlayedDay !== day ? nextDayStreak(profile.lastPlayedDay, profile.dayStreak, day) : undefined}
+      nextStreak={
+        profile && profile.lastPlayedDay !== day
+          ? shieldedStreak(profile.lastPlayedDay, profile.dayStreak, day, shieldReady(profile, pro, day)).streak
+          : undefined
+      }
       onSave={save}
-      onFinish={recordPlay}
+      onFinish={finish}
       onAlreadyFinished={setFinished}
     />
   );

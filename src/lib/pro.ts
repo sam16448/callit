@@ -45,8 +45,8 @@ export const PRO_PERKS: {
 }[] = [
   { icon: 'infinite-outline', text: `Unlimited practice (free: ${FREE_PRACTICE_PER_DAY} a day)` },
   { icon: 'people-outline', text: 'Create private leagues' },
-  { icon: 'stats-chart-outline', text: 'Your stats: accuracy, calls, best runs', soon: true },
-  { icon: 'shield-checkmark-outline', text: 'Streak shield: one missed day a week', soon: true },
+  { icon: 'stats-chart-outline', text: 'Your stats: which calls pay off, best boards, best run' },
+  { icon: 'shield-checkmark-outline', text: 'Streak shield: one missed day a week' },
   { icon: 'sparkles-outline', text: 'Cosmetic effect packs', soon: true },
   { icon: 'ribbon-outline', text: 'Pro badge on the boards' },
 ];

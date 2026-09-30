@@ -42,6 +42,22 @@ export function formatCountdown(ms: number): string {
  * New day-streak after playing on `today`.
  * Same day: unchanged. Played yesterday: +1. Otherwise it starts again at 1.
  */
+/**
+ * Streak with Pro's streak shield: if exactly one day was missed and the
+ * shield hasn't been used this week, the streak carries on (the shield is spent).
+ */
+export function shieldedStreak(
+  lastPlayed: string | null,
+  streak: number,
+  today: string,
+  shieldAvailable: boolean,
+): { streak: number; usedShield: boolean } {
+  if (shieldAvailable && lastPlayed && streak > 0 && previousDay(previousDay(today)) === lastPlayed) {
+    return { streak: streak + 1, usedShield: true };
+  }
+  return { streak: nextDayStreak(lastPlayed, streak, today), usedShield: false };
+}
+
 export function nextDayStreak(lastPlayed: string | null, streak: number, today: string): number {
   if (lastPlayed === today) return Math.max(1, streak);
   if (lastPlayed && previousDay(today) === lastPlayed) return streak + 1;

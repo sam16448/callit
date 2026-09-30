@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { nextDayStreak } from '@/game/time';
+import { shieldedStreak, weekStart } from '@/game/time';
 import { KEYS, loadJson, removeKey, saveJson } from '@/lib/storage';
 import { syncProfile } from '@/services/api';
 import { ONLINE, supabase } from '@/services/supabase';
@@ -13,16 +13,23 @@ export type Profile = {
   bestDayStreak: number;
   /** UTC day of the last ranked run played. */
   lastPlayedDay: string | null;
+  /** Pro streak shield: the week (Monday) it was last used in. */
+  shieldWeek?: string | null;
   createdAt: string;
 };
+
+/** Pro's streak shield is available once per week. */
+export function shieldReady(p: Profile | null, pro: boolean, day: string): boolean {
+  return Boolean(p && pro && p.shieldWeek !== weekStart(new Date(`${day}T12:00:00Z`)));
+}
 
 type ProfileCtx = {
   loaded: boolean;
   profile: Profile | null;
   create: (nickname: string, avatar: string) => void;
   update: (patch: Partial<Pick<Profile, 'nickname' | 'avatar' | 'chill'>>) => void;
-  /** Call when a ranked run finishes. Returns the new day streak. */
-  recordPlay: (day: string) => number;
+  /** Call when a ranked run finishes. Returns the new day streak. `pro` allows the streak shield. */
+  recordPlay: (day: string, pro?: boolean) => number;
   reset: () => void;
 };
 
@@ -59,10 +66,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const update = useCallback<ProfileCtx['update']>((patch) => profile && commit({ ...profile, ...patch }, profile), [profile, commit]);
 
   const recordPlay = useCallback(
-    (day: string) => {
+    (day: string, pro = false) => {
       if (!profile) return 0;
-      const dayStreak = nextDayStreak(profile.lastPlayedDay, profile.dayStreak, day);
-      commit({ ...profile, dayStreak, bestDayStreak: Math.max(profile.bestDayStreak, dayStreak), lastPlayedDay: day }, profile);
+      const { streak: dayStreak, usedShield } = shieldedStreak(profile.lastPlayedDay, profile.dayStreak, day, shieldReady(profile, pro, day));
+      commit(
+        {
+          ...profile,
+          dayStreak,
+          bestDayStreak: Math.max(profile.bestDayStreak, dayStreak),
+          lastPlayedDay: day,
+          shieldWeek: usedShield ? weekStart(new Date(`${day}T12:00:00Z`)) : (profile.shieldWeek ?? null),
+        },
+        profile,
+      );
       return dayStreak;
     },
     [profile, commit],
