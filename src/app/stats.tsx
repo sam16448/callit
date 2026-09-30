@@ -36,7 +36,7 @@ export default function Stats() {
         {rank.rank.emoji} {rank.rank.title}
       </Text>
       <Text style={[T.body, { color: C.muted, marginTop: 4 }]}>
-        {formatPoints(lifetime)} lifetime Aura · best streak {profile?.bestDayStreak ?? 0} days
+        {formatPoints(lifetime)} lifetime Aura · best streak {profile?.bestDayStreak ?? 0} {profile?.bestDayStreak === 1 ? 'day' : 'days'}
       </Text>
 
       <View style={styles.tiles}>

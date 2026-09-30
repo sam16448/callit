@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   heroCrew: { position: 'absolute', right: 6, top: 10 },
   heroHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.accent },
-  heroTitle: { ...T.hero, color: C.text, fontSize: 36, lineHeight: 39, marginTop: S.md, maxWidth: '72%' },
+  heroTitle: { ...T.hero, color: C.text, fontSize: 32, lineHeight: 36, marginTop: S.md, maxWidth: '80%' },
   heroBody: { ...T.body, color: C.muted, marginTop: S.sm, maxWidth: '80%' },
   done: { flexDirection: 'row', alignItems: 'center', gap: S.md, marginTop: S.lg },
   doneScore: { fontFamily: F.display, color: C.text, fontSize: 36, marginTop: 2 },
